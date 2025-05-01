@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "plugins/core"
+		},
+		{
+			"path": "docs"
+		},
+		{
+			"path": "plugins/finance"
+		},
+		{
+			"path": "frontend/financePWA"
+		}
+	],
+	"settings": {}
+}
