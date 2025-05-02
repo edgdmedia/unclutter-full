@@ -17,19 +17,19 @@ class Unclutter_Report_Controller
         register_rest_route('api/v1/finance', '/reports/summary', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_summary'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // By category
         register_rest_route('api/v1/finance', '/reports/by-category', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_by_category'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // By account
         register_rest_route('api/v1/finance', '/reports/by-account', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_by_account'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
 
 
@@ -37,30 +37,23 @@ class Unclutter_Report_Controller
             [
                 'methods' => 'GET',
                 'callback' => [self::class, 'get_summary'],
-                'permission_callback' => [self::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
             ]
         ]);
         register_rest_route('api/v1/finance', '/reports/by-category', [
             [
                 'methods' => 'GET',
                 'callback' => [self::class, 'get_by_category'],
-                'permission_callback' => [self::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
             ]
         ]);
         register_rest_route('api/v1/finance', '/reports/by-account', [
             [
                 'methods' => 'GET',
                 'callback' => [self::class, 'get_by_account'],
-                'permission_callback' => [self::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
             ]
         ]);
-    }
-    public static function auth_required()
-    {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
-        }
-        return true;
     }
 
     public function permissions_check($request)

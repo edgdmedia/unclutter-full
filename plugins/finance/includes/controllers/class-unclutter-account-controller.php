@@ -175,7 +175,7 @@ class Unclutter_Account_Controller
      */
     public static function auth_required($request)
     {
-        return Unclutter_Auth_Controller::auth_required($request);
+        return Unclutter_Finance_Utils::auth_required($request);
     }
 
     /**
@@ -186,11 +186,7 @@ class Unclutter_Account_Controller
      */
     private static function get_profile_id_from_token($request)
     {
-        $auth = $request->get_header('authorization');
-        if (!$auth || stripos($auth, 'Bearer ') !== 0) return null;
-        $jwt = trim(substr($auth, 7));
-        $result = Unclutter_Auth_Service::verify_token($jwt);
-        return $result && !empty($result['success']) ? $result['profile_id'] : null;
+        return Unclutter_Finance_Utils::get_profile_id_from_token($request);
     }
 
     /**

@@ -9,37 +9,107 @@ if (! defined('ABSPATH')) {
 }
 class Unclutter_Budget_Controller
 {
+    
     public static function register_routes()
     {
+        $controller = new self();
         // Get all budgets
         register_rest_route('api/v1/finance', '/budgets', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_budgets'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Create budget
         register_rest_route('api/v1/finance', '/budgets', [
             'methods' => 'POST',
             'callback' => [self::class, 'create_budget'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'category_id' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+                'amount' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+                'month' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+                'year' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+            ],
         ]);
         // Get single budget
         register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_budget'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'id' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+            ],
+        ]);
+        //Get Budget by category and period
+        register_rest_route('api/v1/finance', '/budgets/category/(?P<category_id>\\d+)/(?P<month>\\d+)/(?P<year>\\d+)', [
+            'methods' => 'GET',
+            'callback' => [self::class, 'get_budget_by_category_and_period'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'category_id' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+                'month' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+                'year' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+            ],
         ]);
         // Update budget
         register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
             'methods' => 'PUT',
             'callback' => [self::class, 'update_budget'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'id' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_numeric($param);
+                    },
+                ],
+            ],
         ]);
         // Delete budget
         register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
             'methods' => 'DELETE',
             'callback' => [self::class, 'delete_budget'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
     }
 
@@ -49,11 +119,7 @@ class Unclutter_Budget_Controller
      * @param WP_REST_Request $request
      * @return bool
      */
-    public static function auth_required($request)
-    {
-        $result = Unclutter_Auth_Controller::auth_required($request);
-        return $result && !empty($result['success']);
-    }
+    // Authorization now handled by Unclutter_Finance_Utils::auth_required
 
     public function permissions_check($request)
     {
@@ -69,11 +135,10 @@ class Unclutter_Budget_Controller
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
-    public function get_budgets($request)
+    public static function get_budgets($request)
     {
-        $params = $request->get_params();
-        // $result = Unclutter_Budget_Service::get_budgets($params);
-        return new WP_REST_Response([], 200);
+        $result = Unclutter_Budget_Service::get_budgets($request);
+        return new WP_REST_Response($result, 200);
     }
     /**
      * Get a single budget
@@ -96,7 +161,7 @@ class Unclutter_Budget_Controller
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
-    public function create_budget($request)
+    public static function create_budget($request)
     {
         $data = $request->get_json_params();
         $result = Unclutter_Budget_Service::create_budget($data);
@@ -111,7 +176,7 @@ class Unclutter_Budget_Controller
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
-    public function update_budget($request)
+    public static function update_budget($request)
     {
         $id = (int) $request['id'];
         $data = $request->get_json_params();
@@ -127,7 +192,7 @@ class Unclutter_Budget_Controller
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
-    public function delete_budget($request)
+    public static function delete_budget($request)
     {
         $id = (int) $request['id'];
         $result = Unclutter_Budget_Service::delete_budget($id);

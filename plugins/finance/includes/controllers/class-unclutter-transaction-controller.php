@@ -18,7 +18,7 @@ class Unclutter_Transaction_Controller
         register_rest_route('api/v1/finance', '/transactions', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_transactions'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
             'args' => [
                 'account_id' => [
                     'description' => 'Filter by account ID',
@@ -61,33 +61,26 @@ class Unclutter_Transaction_Controller
         register_rest_route('api/v1/finance', '/transactions', [
             'methods' => 'POST',
             'callback' => [self::class, 'create_transaction'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Get single transaction
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_transaction'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Update transaction
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'PUT',
             'callback' => [self::class, 'update_transaction'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Delete transaction
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'DELETE',
             'callback' => [self::class, 'delete_transaction'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
-    }
-    public static function auth_required()
-    {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
-        }
-        return true;
     }
 
     public function get_transactions($request)

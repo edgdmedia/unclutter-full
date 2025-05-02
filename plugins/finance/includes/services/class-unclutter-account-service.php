@@ -51,6 +51,10 @@ class Unclutter_Account_Service {
      * @return bool True on success, false on failure
      */
     public static function update_account($id, $data) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($id);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
         return Unclutter_Account_Model::update_account($id, $data);
     }
     
@@ -61,6 +65,10 @@ class Unclutter_Account_Service {
      * @return bool True on success, false on failure
      */
     public static function delete_account($id) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($id);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
         return Unclutter_Account_Model::delete_account($id);
     }
     

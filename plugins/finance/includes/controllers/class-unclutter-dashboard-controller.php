@@ -14,21 +14,16 @@ class Unclutter_Dashboard_Controller {
         register_rest_route('api/v1/finance', '/dashboard/summary', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_summary'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Dashboard trends
         register_rest_route('api/v1/finance', '/dashboard/trends', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_trends'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
     }
-    public static function auth_required() {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
-        }
-        return true;
-    }
+
     public function permissions_check($request) {
         if (!is_user_logged_in()) {
             return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));

@@ -14,40 +14,34 @@ class Unclutter_Goal_Controller {
         register_rest_route('api/v1/finance', '/goals', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_goals'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Create goal
         register_rest_route('api/v1/finance', '/goals', [
             'methods' => 'POST',
             'callback' => [self::class, 'create_goal'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Get single goal
         register_rest_route('api/v1/finance', '/goals/(?P<id>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_goal'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Update goal
         register_rest_route('api/v1/finance', '/goals/(?P<id>\\d+)', [
             'methods' => 'PUT',
             'callback' => [self::class, 'update_goal'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
         // Delete goal
         register_rest_route('api/v1/finance', '/goals/(?P<id>\\d+)', [
             'methods' => 'DELETE',
             'callback' => [self::class, 'delete_goal'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
     }
-    public static function auth_required($request) {
-        $auth = $request->get_header('authorization');
-        if (!$auth || stripos($auth, 'Bearer ') !== 0) return false;
-        $jwt = trim(substr($auth, 7));
-        $result = Unclutter_Auth_Service::verify_token($jwt);
-        return $result && !empty($result['success']);
-    }
+
     public function get_goals($request) {
         $params = $request->get_params();
         $result = Unclutter_Goal_Service::get_goals($params);
