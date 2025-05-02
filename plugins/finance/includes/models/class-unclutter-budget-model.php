@@ -98,6 +98,29 @@ class Unclutter_Budget_Model {
         
         return $result !== false;
     }
+
+    /**
+     * Get budgets 
+     * 
+     * @param array $params Query parameters
+     * @return array Array of budget objects
+     */
+    public static function get_budgets($params = []) {
+        global $wpdb;
+        $table = self::get_table_name();
+        $categories_table = $wpdb->prefix . 'unclutter_finance_categories';
+        
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT b.*, c.name as category_name 
+             FROM $table b 
+             LEFT JOIN $categories_table c ON b.category_id = c.id 
+             WHERE b.profile_id = %d AND b.month = %d AND b.year = %d 
+             ORDER BY b.amount DESC",
+            $params['profile_id'],
+            $params['month'],
+            $params['year']
+        ));
+    }
     
     /**
      * Get a budget by ID

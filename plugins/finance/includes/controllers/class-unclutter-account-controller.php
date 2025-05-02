@@ -71,7 +71,6 @@ class Unclutter_Account_Controller
                     ],
                 ],
             ]
-
         ]);
 
         // Get a single account
@@ -129,7 +128,7 @@ class Unclutter_Account_Controller
                 'callback' => [self::class, 'delete_account'],
                 'permission_callback' => [self::class, 'auth_required'],
             ],
-        ]);ß
+        ]);
 
         // Get account balance history
         register_rest_route('api/v1/finance', '/accounts/(?P<id>\d+)/balance-history', [
@@ -176,11 +175,7 @@ class Unclutter_Account_Controller
      */
     public static function auth_required($request)
     {
-        $auth = $request->get_header('authorization');
-        if (!$auth || stripos($auth, 'Bearer ') !== 0) return false;
-        $jwt = trim(substr($auth, 7));
-        $result = Unclutter_Auth_Service::verify_token($jwt);
-        return $result && !empty($result['success']);
+        return Unclutter_Auth_Controller::auth_required($request);
     }
 
     /**
@@ -281,7 +276,7 @@ class Unclutter_Account_Controller
         $type_id = intval($params['type_id'] ?? 0);
 
         if (empty($name) || empty($type_id)) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Name and type are required'], 400);
+            return new WP_REST_Response(['success' => false, 'message' => 'Name and type are required' . $name . $type_id], 400);
         }
 
         // Check if type exists and belongs to the user or is a system type

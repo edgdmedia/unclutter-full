@@ -7,10 +7,8 @@ if (!defined('ABSPATH')) exit;
  * Handles REST API endpoints for categories (unified taxonomy)
  */
 class Unclutter_Category_Controller {
-    private static $service;
 
     public static function register_routes() {
-        self::$service = new Unclutter_Category_Service();
         // Get all categories by type
         register_rest_route('api/v1/finance', '/categories', [
             'methods' => 'GET',

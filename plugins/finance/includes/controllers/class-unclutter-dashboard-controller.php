@@ -29,21 +29,6 @@ class Unclutter_Dashboard_Controller {
         }
         return true;
     }
-        register_rest_route($this->namespace, '/' . $this->resource . '/summary', [
-            [
-                'methods' => WP_REST_Server::READABLE,
-                'callback' => [$this, 'get_summary'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ]
-        ]);
-        register_rest_route($this->namespace, '/' . $this->resource . '/trends', [
-            [
-                'methods' => WP_REST_Server::READABLE,
-                'callback' => [$this, 'get_trends'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ]
-        ]);
-    }
     public function permissions_check($request) {
         if (!is_user_logged_in()) {
             return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));

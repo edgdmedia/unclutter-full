@@ -117,6 +117,46 @@ class Unclutter_Goal_Model {
             $id
         ));
     }
+
+    /**
+     * Get all goals
+     * 
+     * @param array $args Additional arguments (status, account_id, etc.)
+     * @return array Array of goal objects
+     */
+    public static function get_goals($args = []) {
+        global $wpdb;
+        $table = self::get_table_name();
+        $accounts_table = $wpdb->prefix . 'unclutter_finance_accounts';
+        
+        $query = "SELECT g.*, a.name as account_name 
+                 FROM $table g 
+                 LEFT JOIN $accounts_table a ON g.account_id = a.id";
+        $params = [];
+        
+        // Add status filter if provided
+        if (isset($args['status'])) {
+            $query .= " AND g.status = %s";
+            $params[] = $args['status'];
+        }
+        
+        // Add account_id filter if provided
+        if (isset($args['account_id'])) {
+            $query .= " AND g.account_id = %d";
+            $params[] = $args['account_id'];
+        }
+        
+        // Add goal_type filter if provided
+        if (isset($args['goal_type'])) {
+            $query .= " AND g.goal_type = %s";
+            $params[] = $args['goal_type'];
+        }
+        
+        // Add order by
+        $query .= " ORDER BY g.target_date ASC";
+        
+        return $wpdb->get_results($wpdb->prepare($query, $params));
+    }
     
     /**
      * Get goals by profile ID

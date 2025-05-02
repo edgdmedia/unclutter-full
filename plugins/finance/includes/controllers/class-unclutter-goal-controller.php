@@ -41,56 +41,21 @@ class Unclutter_Goal_Controller {
             'permission_callback' => [self::class, 'auth_required'],
         ]);
     }
-    public static function auth_required() {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
-        }
-        return true;
-    }
-        register_rest_route($this->namespace, '/' . $this->resource, [
-            [
-                'methods' => WP_REST_Server::READABLE,
-                'callback' => [$this, 'get_goals'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ],
-            [
-                'methods' => WP_REST_Server::CREATABLE,
-                'callback' => [$this, 'create_goal'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ]
-        ]);
-        register_rest_route($this->namespace, '/' . $this->resource . '/(?P<id>\\d+)', [
-            [
-                'methods' => WP_REST_Server::READABLE,
-                'callback' => [$this, 'get_goal'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ],
-            [
-                'methods' => WP_REST_Server::EDITABLE,
-                'callback' => [$this, 'update_goal'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ],
-            [
-                'methods' => WP_REST_Server::DELETABLE,
-                'callback' => [$this, 'delete_goal'],
-                'permission_callback' => [$this, 'permissions_check'],
-            ]
-        ]);
-    }
-    public function permissions_check($request) {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
-        }
-        return true;
+    public static function auth_required($request) {
+        $auth = $request->get_header('authorization');
+        if (!$auth || stripos($auth, 'Bearer ') !== 0) return false;
+        $jwt = trim(substr($auth, 7));
+        $result = Unclutter_Auth_Service::verify_token($jwt);
+        return $result && !empty($result['success']);
     }
     public function get_goals($request) {
         $params = $request->get_params();
-        $result = $this->service->get_goals($params);
+        $result = Unclutter_Goal_Service::get_goals($params);
         return rest_ensure_response($result);
     }
     public function get_goal($request) {
         $id = (int) $request['id'];
-        $result = $this->service->get_goal($id);
+        $result = Unclutter_Goal_Service::get_goal($id);
         if (!$result) {
             return new WP_Error('not_found', __('Goal not found.'), array('status' => 404));
         }
@@ -107,7 +72,7 @@ class Unclutter_Goal_Controller {
     public function update_goal($request) {
         $id = (int) $request['id'];
         $data = $request->get_json_params();
-        $result = $this->service->update_goal($id, $data);
+        $result = Unclutter_Goal_Service::update_goal($id, $data);
         if (is_wp_error($result)) {
             return $result;
         }
