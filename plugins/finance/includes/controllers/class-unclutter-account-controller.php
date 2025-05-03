@@ -165,6 +165,15 @@ class Unclutter_Account_Controller
                 ],
             ],
         ]);
+
+        //Accounts Transactions
+        register_rest_route('api/v1/finance', '/accounts/(?P<id>\d+)/transactions', [
+            [
+                'methods' => 'GET',
+                'callback' => [self::class, 'get_account_transactions'],
+                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            ],
+        ]);
     }
 
 
@@ -198,7 +207,7 @@ class Unclutter_Account_Controller
 
         return new WP_REST_Response([
             'success' => true,
-            'accounts' => $accounts,
+            'data' => $accounts,
             'total_balance' => $total_balance
         ], 200);
     }
@@ -452,5 +461,24 @@ class Unclutter_Account_Controller
         $accounts = Unclutter_Account_Service::search_accounts($profile_id, $search);
 
         return new WP_REST_Response(['success' => true, 'accounts' => $accounts], 200);
+    }
+
+    /**
+     * Get account transactions
+     * 
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_account_transactions($request)
+    {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $id = $request->get_param('id');
+        $transactions = Unclutter_Transaction_Service::get_transactions($profile_id, $id);
+
+        return new WP_REST_Response(['success' => true, 'transactions' => $transactions], 200);
     }
 }

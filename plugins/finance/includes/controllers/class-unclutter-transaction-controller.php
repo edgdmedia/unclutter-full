@@ -141,8 +141,34 @@ class Unclutter_Transaction_Controller
     {
         $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $params = $request->get_params();
-        $result = Unclutter_Transaction_Service::get_transactions($profile_id, $params);
-        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
+
+        // Pagination
+        $per_page = isset($params['per_page']) && (int)$params['per_page'] > 0 ? (int)$params['per_page'] : 10;
+        $page = isset($params['page']) && (int)$params['page'] > 0 ? (int)$params['page'] : 1;
+        $offset = ($page - 1) * $per_page;
+
+        // Allow order and order_by from query string even if not in route args
+        if (isset($_GET['order'])) {
+            $params['order'] = $_GET['order'];
+        }
+        if (isset($_GET['order_by'])) {
+            $params['order_by'] = $_GET['order_by'];
+        }
+
+        $transactions = Unclutter_Transaction_Service::get_transactions($profile_id, $params, $per_page, $offset);
+        $total = Unclutter_Transaction_Service::count_transactions($profile_id, $params);
+
+        $response = [
+            'success' => true,
+            'data' => $transactions,
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $per_page,
+                'page' => $page,
+                'total_pages' => $per_page > 0 ? (int)ceil($total / $per_page) : 1,
+            ]
+        ];
+        return new WP_REST_Response($response, 200);
     }
 
     public static function get_transaction($request)
@@ -165,7 +191,7 @@ class Unclutter_Transaction_Controller
         if (is_wp_error($result)) {
             return $result;
         }
-        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
+        return new WP_REST_Response(['success' => true], 200);
     }
 
     public static function update_transaction($request)
@@ -178,7 +204,7 @@ class Unclutter_Transaction_Controller
         if (is_wp_error($result)) {
             return $result;
         }
-        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
+        return new WP_REST_Response(['success' => true], 200);
     }
 
     public static function delete_transaction($request)
@@ -189,7 +215,7 @@ class Unclutter_Transaction_Controller
         if (is_wp_error($result)) {
             return $result;
         }
-        return new WP_REST_Response(['deleted' => true]);
+        return new WP_REST_Response(['success' => true], 200);
     }
 }
 

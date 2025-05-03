@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Calendar, Clock } from 'lucide-react';
+import { formatCurrency as formatCurrencyUtil } from '@/utils/formatters';
 
 interface Goal {
   id: string;
@@ -31,12 +31,7 @@ const GoalCard: React.FC<GoalCardProps> = ({ goal, onClick }) => {
   const progressPercentage = Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return formatCurrencyUtil(amount).replace(/\.\d+/, '');
   };
 
   return (

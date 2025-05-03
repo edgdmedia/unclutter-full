@@ -8,8 +8,10 @@ export async function login(email: string, password: string) {
     body: JSON.stringify({ email, password })
   });
   const data = await res.json();
+  console.log(data);
   if (!res.ok) throw new Error(data.message || 'Login failed');
-  if (data.token) localStorage.setItem('token', data.token);
+  if (data.access_token) localStorage.setItem('token', data.access_token);
+  if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token);
   return data;
 }
 

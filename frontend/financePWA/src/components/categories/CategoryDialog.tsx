@@ -1,8 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useFinance } from '@/context/FinanceContext';
 
 import {
   Dialog,
@@ -49,6 +50,7 @@ interface CategoryDialogProps {
   initialCategory: Category | null;
   categoryType: CategoryType;
   onSave: (category: Category) => void;
+  parentId?: string | null;
 }
 
 const formSchema = z.object({
@@ -64,8 +66,21 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
   onOpenChange,
   initialCategory,
   categoryType,
-  onSave
+  onSave,
+  parentId
 }) => {
+  const { categories } = useFinance();
+  const [parentCategories, setParentCategories] = useState<Category[]>([]);
+  
+  // Filter parent categories based on the selected type
+  useEffect(() => {
+    if (categories && categories.length > 0) {
+      const filtered = categories.filter(cat => 
+        cat.type === categoryType && (!initialCategory || cat.id !== initialCategory.id)
+      );
+      setParentCategories(filtered);
+    }
+  }, [categories, categoryType, initialCategory]);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -84,7 +99,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
         name: initialCategory.name,
         type: initialCategory.type,
         description: initialCategory.description || '',
-        parent: initialCategory.parent || '',
+        parent: initialCategory.parent_id || '',
       });
     } else {
       form.reset({
@@ -92,10 +107,10 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
         name: '',
         type: categoryType,
         description: '',
-        parent: '',
+        parent: parentId || '',
       });
     }
-  }, [initialCategory, categoryType, form]);
+  }, [initialCategory, categoryType, form, parentId]);
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     onSave({
@@ -172,6 +187,36 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Parent Category Selection */}
+            <FormField
+              control={form.control}
+              name="parent"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Parent Category (Optional)</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || ""}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a parent category (optional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {parentCategories.map(category => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

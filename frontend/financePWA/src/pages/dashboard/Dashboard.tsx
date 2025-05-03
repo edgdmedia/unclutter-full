@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wallet, Plus, ChevronRight, DollarSign, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
@@ -10,18 +9,33 @@ import TransactionList from '@/components/dashboard/TransactionList';
 import BudgetProgress from '@/components/dashboard/BudgetProgress';
 import GoalCard from '@/components/dashboard/GoalCard';
 import { useFinance } from '@/context/FinanceContext';
+import { formatCurrency } from '@/utils/formatters';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { accounts, transactions, budgets, goals, financialSummary } = useFinance();
+  const { 
+    dashboardSummary,
+    dashboardTrends,
+    transactions,
+    fetchDashboardSummary,
+    fetchDashboardTrends,
+    fetchTransactions
+  } = useFinance();
+  
+  // Fetch dashboard data if not already loaded
+  React.useEffect(() => {
+    if (!dashboardSummary) {
+      fetchDashboardSummary();
+    }
+    if (!dashboardTrends) {
+      fetchDashboardTrends();
+    }
+    if (transactions.length === 0) {
+      fetchTransactions(5);
+    }
+  }, [dashboardSummary, dashboardTrends, transactions.length, fetchDashboardSummary, fetchDashboardTrends, fetchTransactions]);
 
-  // Format currency function
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  // Using formatCurrency from utils
 
   return (
     <div className="space-y-8 pb-10">
@@ -36,29 +50,31 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Balance"
-          value={formatCurrency(financialSummary.totalBalance)}
+          value={dashboardSummary ? formatCurrency(dashboardSummary.net_balance) : '...'}
           icon={<DollarSign className="h-4 w-4 text-primary" />}
         />
         <StatCard
           title="Income"
-          value={formatCurrency(financialSummary.income)}
+          value={dashboardSummary ? formatCurrency(dashboardSummary.total_income) : '...'}
           icon={<TrendingUp className="h-4 w-4 text-finance-green" />}
           trend="up"
-          trendValue="+8.2% from last month"
+          trendValue={dashboardTrends ? `Trend over ${dashboardTrends.labels.length} months` : 'Loading...'}
         />
         <StatCard
           title="Expenses"
-          value={formatCurrency(financialSummary.expenses)}
+          value={dashboardSummary ? formatCurrency(dashboardSummary.total_expenses) : '...'}
           icon={<TrendingDown className="h-4 w-4 text-finance-red" />}
           trend="down"
-          trendValue="-3.1% from last month"
+          trendValue={dashboardTrends ? `Trend over ${dashboardTrends.labels.length} months` : 'Loading...'}
         />
         <StatCard
           title="Savings"
-          value={formatCurrency(financialSummary.savings)}
+          value={dashboardSummary ? 
+            formatCurrency(dashboardSummary.total_income - dashboardSummary.total_expenses) : 
+            '...'}
           icon={<BarChart3 className="h-4 w-4 text-amber-500" />}
           trend="up"
-          trendValue="+12.5% from last month"
+          trendValue={dashboardTrends ? `Based on ${dashboardTrends.labels[dashboardTrends.labels.length-1]}` : 'Loading...'}
         />
       </div>
 
@@ -71,16 +87,21 @@ const Dashboard: React.FC = () => {
           </Button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {accounts.map((account) => (
-            <AccountCard
-              key={account.id}
-              name={account.name}
-              balance={account.balance}
-              type={account.type}
-              institution={account.institution}
-              onClick={() => navigate(`/accounts/${account.id}`)}
-            />
-          ))}
+          {dashboardSummary && dashboardSummary.accounts ? 
+            dashboardSummary.accounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                name={account.name}
+                balance={parseFloat(account.balance)}
+                type={account.type_name}
+                institution={account.institution}
+                onClick={() => navigate(`/accounts/${account.id}`)}
+              />
+            )) : 
+            <div className="col-span-full text-center py-8">
+              <p className="text-muted-foreground">Loading accounts...</p>
+            </div>
+          }
         </div>
       </div>
 
@@ -95,7 +116,13 @@ const Dashboard: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            <TransactionList transactions={transactions} limit={5} />
+            {transactions.length > 0 ? (
+              <TransactionList transactions={transactions} limit={5} />
+            ) : (
+              <div className="py-8 text-center">
+                <p className="text-muted-foreground">Loading transactions...</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -108,7 +135,10 @@ const Dashboard: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            <BudgetProgress budgets={budgets} limit={3} />
+            {/* We'll implement real budget API in the next step */}
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground">Loading budget data...</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -122,13 +152,10 @@ const Dashboard: React.FC = () => {
           </Button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {goals.filter(goal => goal.status === 'active').slice(0, 3).map((goal) => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              onClick={() => navigate(`/goals/${goal.id}`)}
-            />
-          ))}
+          {/* We'll implement real goals API in the next step */}
+          <div className="col-span-full py-8 text-center">
+            <p className="text-muted-foreground">Loading savings goals...</p>
+          </div>
         </div>
       </div>
     </div>

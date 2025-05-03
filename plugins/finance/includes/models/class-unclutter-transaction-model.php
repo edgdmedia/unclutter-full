@@ -106,7 +106,7 @@ class Unclutter_Transaction_Model extends Unclutter_Base_Model {
      * @param array $attachments Optional array of attachment URLs (adds to existing attachments)
      * @return bool True on success, false on failure
      */
-    public static function update_transaction($id, $data, $tags = null, $attachments = []) {
+    public static function update_transaction($profile_id, $id, $data, $tags = null, $attachments = []) {
         global $wpdb;
         $table = self::get_table_name();
         
@@ -115,7 +115,7 @@ class Unclutter_Transaction_Model extends Unclutter_Base_Model {
         
         try {
             // Get current transaction data for balance adjustment
-            $current_transaction = self::get_transaction($id);
+            $current_transaction = self::get_transaction($profile_id, $id);
             
             if (!$current_transaction) {
                 throw new Exception('Transaction not found');

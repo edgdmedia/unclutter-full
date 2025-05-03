@@ -94,7 +94,7 @@ class Unclutter_Transaction_Service {
                 return new WP_Error('db_error', 'Transaction created, but failed to add attachments.');
             }
         }
-        return Unclutter_Transaction_Model::get_transaction($transaction_id);
+        return Unclutter_Transaction_Model::get_transaction($profile_id, $transaction_id);
     }
     
     /**
@@ -106,12 +106,33 @@ class Unclutter_Transaction_Service {
      * @param array $attachments Optional array of attachment URLs
      * @return bool True on success, false on failure
      */
-    public static function update_transaction($profile_id, $id, $data, $tags = null, $attachments = []) {
+    public static function update_transaction($profile_id, $id, $data) {
         // Get the original transaction for comparison
         $original = Unclutter_Transaction_Model::get_transaction($profile_id, $id);
+
+        // Extract tags and attachments, remove from $data
+        $tags = isset($data['tags']) ? $data['tags'] : [];
+        unset($data['tags']);
+        $attachments = isset($data['attachments']) ? $data['attachments'] : [];
+        unset($data['attachments']);
         
         // Update transaction
-        $updated = Unclutter_Transaction_Model::update_transaction($id, $data, $tags, $attachments);
+        $updated = Unclutter_Transaction_Model::update_transaction($profile_id, $id, $data);
+
+        // Add tags if provided
+        if (!empty($tags)) {
+            $success = Unclutter_Transaction_Model::add_tags_to_transaction($id, $tags);
+            if (!$success) {
+                return new WP_Error('db_error', 'Transaction created, but failed to add tags.');
+            }
+        }
+        // Add attachments if provided
+        if (!empty($attachments)) {
+            $success = Unclutter_Transaction_Model::add_attachments_to_transaction($id, $attachments);
+            if (!$success) {
+                return new WP_Error('db_error', 'Transaction created, but failed to add attachments.');
+            }
+        }
         
         // Update percentage-based goals if this was an income transaction
         // and the amount or category changed
@@ -281,7 +302,7 @@ class Unclutter_Transaction_Service {
      * @return bool True if the transaction belongs to the profile
      */
     public static function transaction_belongs_to_profile($transaction_id, $profile_id) {
-        $transaction = Unclutter_Transaction_Model::get_transaction($transaction_id);
+        $transaction = Unclutter_Transaction_Model::get_transaction($profile_id, $transaction_id);
         
         if (!$transaction) {
             return false;

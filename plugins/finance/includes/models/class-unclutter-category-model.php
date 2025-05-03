@@ -153,7 +153,7 @@ class Unclutter_Category_Model extends Unclutter_Base_Model {
             $args['is_active'] = 1;
         }
         
-        return self::get_categories_by_profile_and_type($profile_id, 'account_type', $args);
+        return self::get_categories_by_profile_and_type($profile_id, 'account', $args);
     }
     
     /**

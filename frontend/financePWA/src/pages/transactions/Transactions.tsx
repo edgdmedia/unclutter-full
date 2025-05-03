@@ -1,62 +1,105 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, Search, ChevronDown, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Plus, Filter, Search, ChevronDown, ArrowUpRight, ArrowDownLeft, Loader2 } from 'lucide-react';
 import { useFinance } from '@/context/FinanceContext';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import { toast } from '@/components/ui/sonner';
+import { Transaction } from '@/services/transactionsApi';
 
 const Transactions: React.FC = () => {
-  const { transactions, addTransaction } = useFinance();
+  const { transactions, fetchTransactions, addTransaction } = useFinance();
   const [searchQuery, setSearchQuery] = useState('');
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Fetch transactions when component mounts
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (transactions.length === 0) {
+        setIsLoading(true);
+        try {
+          await fetchTransactions(20); // Fetch more transactions for the transactions page
+        } catch (error) {
+          console.error('Failed to fetch transactions:', error);
+          toast.error('Failed to load transactions');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    loadTransactions();
+  }, [fetchTransactions, transactions.length]);
   
   // Filter transactions based on search query
-  const filteredTransactions = transactions.filter((transaction) => 
-    transaction.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    transaction.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTransactions = transactions.filter((transaction) => {
+    const description = transaction.description || '';
+    const category = transaction.category_name || '';
+    return description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           category.toLowerCase().includes(searchQuery.toLowerCase());
+  });
   
   // Group transactions by date
   const transactionsByDate = filteredTransactions.reduce((grouped, transaction) => {
-    const date = format(new Date(transaction.date), 'yyyy-MM-dd');
+    // Use transaction_date from API
+    const date = format(parseISO(transaction.transaction_date), 'yyyy-MM-dd');
     if (!grouped[date]) {
       grouped[date] = [];
     }
     grouped[date].push(transaction);
     return grouped;
-  }, {} as Record<string, typeof transactions>);
+  }, {} as Record<string, Transaction[]>);
 
-  const handleAddTransaction = (values: any) => {
-    const newTransaction = {
-      date: values.date.toISOString(),
-      amount: values.type === 'expense' ? -Math.abs(values.amount) : values.amount,
-      description: values.description || 'Unnamed transaction',
-      category: values.category || 'Uncategorized',
-      accountId: values.account,
-      type: values.type
-    };
-    
-    addTransaction(newTransaction);
-    toast.success('Transaction added successfully!');
-    setShowTransactionForm(false);
+  const handleAddTransaction = async (values: any) => {
+    try {
+      setIsLoading(true);
+      
+      // Format transaction data for the API
+      const newTransaction = {
+        transaction_date: values.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        amount: values.amount,
+        description: values.description || 'Unnamed transaction',
+        category_id: values.category || '1', // Default to first category if none selected
+        account_id: values.account,
+        type: values.type,
+        tags: values.tags || [],
+        notes: values.notes || ''
+      };
+      
+      // Call the real API method
+      await addTransaction(newTransaction as any);
+      toast.success('Transaction added successfully!');
+      setShowTransactionForm(false);
+      
+      // Refresh transactions list
+      await fetchTransactions(20);
+    } catch (error) {
+      console.error('Failed to add transaction:', error);
+      toast.error('Failed to add transaction. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleViewTransaction = (transaction: any) => {
+  const handleViewTransaction = (transaction: Transaction) => {
     // Create a detailed view of transaction for form dialog
     const accountObj = {
-      id: transaction.accountId
+      id: transaction.account_id
     };
     
     const viewTransaction = {
       ...transaction,
       account: accountObj,
       // Convert string date to Date object for the form
-      date: new Date(transaction.date)
+      date: parseISO(transaction.transaction_date),
+      // Map API fields to form fields
+      category: transaction.category_id,
+      amount: parseFloat(transaction.amount)
     };
     
     setSelectedTransaction(viewTransaction);
@@ -74,6 +117,12 @@ const Transactions: React.FC = () => {
           <Plus size={16} className="mr-1" /> Add Transaction
         </Button>
       </div>
+      
+      {isLoading && (
+        <div className="flex justify-center py-10">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-grow">
@@ -114,8 +163,10 @@ const Transactions: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <h3 className="font-medium">{transaction.description}</h3>
-                        <p className="text-xs text-muted-foreground">{transaction.category}</p>
+                        <h3 className="font-medium">{transaction.description || 'Unnamed transaction'}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {transaction.category_name || 'Uncategorized'} • {transaction.account_name || 'Unknown account'}
+                        </p>
                       </div>
                     </div>
                     <div>
@@ -123,7 +174,7 @@ const Transactions: React.FC = () => {
                         transaction.type === 'income' ? 'text-finance-green' : 'text-finance-red'
                       }`}>
                         {transaction.type === 'income' ? '+' : '-'}
-                        ${Math.abs(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₦{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </button>

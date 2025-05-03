@@ -171,12 +171,12 @@ class Unclutter_Finance_DB_Installer {
         
         // Default account types (system-wide, profile_id = 0)
         $default_account_types = [
-            ['name' => 'Checking', 'type' => 'account_type', 'description' => 'Checking account'],
-            ['name' => 'Savings', 'type' => 'account_type', 'description' => 'Savings account'],
-            ['name' => 'Credit Card', 'type' => 'account_type', 'description' => 'Credit card account'],
-            ['name' => 'Investment', 'type' => 'account_type', 'description' => 'Investment account'],
-            ['name' => 'Loan', 'type' => 'account_type', 'description' => 'Loan account'],
-            ['name' => 'Cash', 'type' => 'account_type', 'description' => 'Cash account']
+            ['name' => 'Checking', 'type' => 'account', 'description' => 'Checking account'],
+            ['name' => 'Savings', 'type' => 'account', 'description' => 'Savings account'],
+            ['name' => 'Credit Card', 'type' => 'account', 'description' => 'Credit card account'],
+            ['name' => 'Investment', 'type' => 'account', 'description' => 'Investment account'],
+            ['name' => 'Loan', 'type' => 'account', 'description' => 'Loan account'],
+            ['name' => 'Cash', 'type' => 'account', 'description' => 'Cash account']
         ];
         
         // Default income categories

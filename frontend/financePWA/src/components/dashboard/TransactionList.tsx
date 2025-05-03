@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { Wallet, ArrowDown, ArrowUp, ArrowLeftRight } from 'lucide-react';
-import { Transaction } from '@/data/mockData';
+import { Transaction } from '@/services/transactionsApi';
 import { cn } from '@/lib/utils';
+import { formatCurrency as formatCurrencyUtil } from '@/utils/formatters';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -12,14 +12,14 @@ interface TransactionListProps {
 const TransactionList: React.FC<TransactionListProps> = ({ transactions, limit }) => {
   const displayTransactions = limit ? transactions.slice(0, limit) : transactions;
   
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(Math.abs(amount));
+  // Wrapper to handle string amounts and absolute values
+  const formatCurrency = (amount: string | number) => {
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return formatCurrencyUtil(Math.abs(numAmount));
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
@@ -50,15 +50,15 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, limit }
                 {getTransactionIcon(transaction.type)}
               </div>
               <div>
-                <p className="font-medium text-sm">{transaction.description}</p>
-                <p className="text-xs text-muted-foreground">{formatDate(transaction.date)}</p>
+                <p className="font-medium text-sm">{transaction.description || transaction.category_name}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(transaction.transaction_date)} • {transaction.account_name}</p>
               </div>
             </div>
             <div className={cn(
               "font-medium",
-              transaction.amount > 0 ? "text-finance-green" : "text-finance-red"
+              transaction.type === 'income' ? "text-finance-green" : "text-finance-red"
             )}>
-              {transaction.amount > 0 ? '+' : '-'}{formatCurrency(transaction.amount)}
+              {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
             </div>
           </div>
         ))

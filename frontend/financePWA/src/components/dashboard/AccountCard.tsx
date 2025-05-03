@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from '@/lib/utils';
+import { formatCurrency as formatCurrencyUtil } from '@/utils/formatters';
 import { Wallet, PiggyBank, CreditCard, TrendingUp } from 'lucide-react';
 
 interface AccountCardProps {
@@ -20,10 +20,7 @@ const AccountCard: React.FC<AccountCardProps> = ({
   onClick,
 }) => {
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return formatCurrencyUtil(amount);
   };
 
   const getIcon = () => {

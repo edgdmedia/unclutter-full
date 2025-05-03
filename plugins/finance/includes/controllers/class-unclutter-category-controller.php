@@ -200,7 +200,7 @@ class Unclutter_Category_Controller {
                 $categories = [];
                 
                 // Get account types
-                $account_types = Unclutter_Category_Model::get_categories_by_profile_and_type($profile_id, 'account_type', $args);
+                $account_types = Unclutter_Category_Model::get_categories_by_profile_and_type($profile_id, 'account', $args);
                 foreach ($account_types as $category) {
                     $categories[] = $category;
                 }
@@ -259,39 +259,12 @@ class Unclutter_Category_Controller {
         $per_page = (int)$request->get_param('per_page');
         $result = Unclutter_Category_Service::get_category_details($id, $profile_id, $month, $year, $page, $per_page);
         return new WP_REST_Response([
-            'success' => $result['success'],
+            'success' => true,
             'data' => $result['data'],
             'message' => $result['message']
-        ], $result['status']);
+        ], 200);
     }
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        $id = $request->get_param('id');
-        $month = $request->get_param('month');
-        $year = $request->get_param('year');
-        $result = Unclutter_Category_Service::get_category_details($id, $profile_id, $month, $year);
-        return new WP_REST_Response([
-            'success' => $result['success'],
-            'data' => $result['data'],
-            'message' => $result['message']
-        ], $result['status']);
-    }
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        $id = $request->get_param('id');
-        $month = $request->get_param('month');
-        $year = $request->get_param('year');
-        $result = Unclutter_Category_Service::get_category_with_budget($id, $profile_id, $month, $year);
-        return new WP_REST_Response([
-            'success' => $result['success'],
-            'data' => $result['data'],
-            'message' => $result['message']
-        ], $result['status']);
-    }
+       
 
     /**
      * Get a single category

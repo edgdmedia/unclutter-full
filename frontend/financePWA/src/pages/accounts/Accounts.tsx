@@ -1,18 +1,32 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Filter, ChevronRight } from 'lucide-react';
 import { useFinance } from '@/context/FinanceContext';
 import AccountFormDialog from '@/components/accounts/AccountFormDialog';
 import DeleteAccountDialog from '@/components/accounts/DeleteAccountDialog';
+import { toast } from '@/components/ui/sonner';
 
 const Accounts: React.FC = () => {
-  const { accounts } = useFinance();
+  const {
+    accounts,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    fetchAccounts
+  } = useFinance();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
+  // Force a refresh of accounts when component mounts
+  useEffect(() => {
+    console.log('Accounts component mounted, refreshing accounts');
+    fetchAccounts();
+  }, []);
+
   // Calculate total balance across all accounts
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
 
@@ -40,6 +54,49 @@ const Accounts: React.FC = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  // Handle submit for add or edit
+  const handleFormSubmit = async (values: any) => {
+    setIsLoading(true);
+    try {
+      if (selectedAccount && selectedAccount.id) {
+        await updateAccount(selectedAccount.id, values);
+        toast.success('Account updated successfully!');
+      } else {
+        await addAccount(values);
+        toast.success('Account added successfully!');
+      }
+      // Refresh accounts list
+      await fetchAccounts();
+      setIsFormOpen(false);
+      setSelectedAccount(null);
+    } catch (err) {
+      console.error('Error saving account:', err);
+      toast.error('Failed to save account.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle confirm delete
+  const handleConfirmDelete = async () => {
+    if (selectedAccount && selectedAccount.id) {
+      setIsLoading(true);
+      try {
+        await deleteAccount(selectedAccount.id);
+        toast.success('Account deleted successfully!');
+        // Refresh accounts list
+        await fetchAccounts();
+      } catch (err) {
+        console.error('Error deleting account:', err);
+        toast.error('Failed to delete account.');
+      } finally {
+        setIsLoading(false);
+        setIsDeleteDialogOpen(false);
+        setSelectedAccount(null);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -48,7 +105,7 @@ const Accounts: React.FC = () => {
           <Button variant="outline" size="sm">
             <Filter size={16} className="mr-1" /> Filter
           </Button>
-          <Button size="sm" onClick={handleAddAccount}>
+          <Button size="sm" onClick={handleAddAccount} disabled={isLoading}>
             <Plus size={16} className="mr-1" /> Add Account
           </Button>
         </div>
@@ -59,7 +116,7 @@ const Accounts: React.FC = () => {
           <div className="text-center py-4">
             <p className="text-sm text-muted-foreground">Total Balance</p>
             <h2 className="text-3xl font-bold text-finance-blue">
-              ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totalBalance}
             </h2>
           </div>
         </CardContent>
@@ -119,14 +176,22 @@ const Accounts: React.FC = () => {
 
       <AccountFormDialog
         open={isFormOpen}
-        onOpenChange={setIsFormOpen}
+        onOpenChange={(open: boolean) => {
+          if (!open) setSelectedAccount(null);
+          setIsFormOpen(open);
+        }}
         initialAccount={selectedAccount}
+        onSubmit={handleFormSubmit}
       />
 
       <DeleteAccountDialog
         open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
+        onOpenChange={(open: boolean) => {
+          if (!open) setSelectedAccount(null);
+          setIsDeleteDialogOpen(open);
+        }}
         account={selectedAccount}
+        onConfirmDelete={handleConfirmDelete}
       />
     </div>
   );
