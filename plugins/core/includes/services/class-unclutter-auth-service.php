@@ -235,6 +235,16 @@ class Unclutter_Auth_Service {
         return ['success' => true];
     }
 
+    public static function change_password($profile_id, $current_password, $new_password) {
+        $hash = Unclutter_Profile_Model::get_meta($profile_id, 'password_hash');
+        if (!wp_check_password($current_password, $hash)) {
+            return ['success' => false, 'message' => 'Invalid current password'];
+        }
+        $hash = wp_hash_password($new_password);
+        Unclutter_Profile_Model::set_meta($profile_id, ['password_hash' => $hash]);
+        return ['success' => true];
+    }
+
     /**
      * Validate JWT token
      */

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StatCard from '@/components/dashboard/StatCard';
 import AccountCard from '@/components/dashboard/AccountCard';
 import TransactionList from '@/components/dashboard/TransactionList';
+import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import BudgetProgress from '@/components/dashboard/BudgetProgress';
 import GoalCard from '@/components/dashboard/GoalCard';
 import { useFinance } from '@/context/FinanceContext';
@@ -37,11 +38,44 @@ const Dashboard: React.FC = () => {
 
   // Using formatCurrency from utils
 
+    const handleAddTransaction = async (values: any) => {
+      try {
+        setIsLoading(true);
+        
+        // Format transaction data for the API
+        const newTransaction = {
+          transaction_date: values.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+          amount: values.amount,
+          description: values.description || 'Unnamed transaction',
+          category_id: values.category || '1', // Default to first category if none selected
+          account_id: values.account,
+          type: values.type,
+          tags: values.tags || [],
+          notes: values.notes || ''
+        };
+        
+        // Call the real API method
+        await addTransaction(newTransaction as any);
+        toast.success('Transaction added successfully!');
+        setShowTransactionForm(false);
+        
+        // Refresh transactions list
+        await fetchTransactions(20);
+      } catch (error) {
+        console.error('Failed to add transaction:', error);
+        toast.error('Failed to add transaction. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
   return (
     <div className="space-y-8 pb-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <Button variant="outline" onClick={() => navigate('/transactions/new')}>
+        <Button size="sm" onClick={() => {
+                  handleAddTransaction(null);
+                }}>
           <Plus className="mr-2 h-4 w-4" /> Add Transaction
         </Button>
       </div>
