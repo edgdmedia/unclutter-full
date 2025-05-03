@@ -7,9 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 class Unclutter_Dashboard_Controller {
-    private static $service;
     public static function register_routes() {
-        self::$service = new Unclutter_Dashboard_Service();
         // Dashboard summary
         register_rest_route('api/v1/finance', '/dashboard/summary', [
             'methods' => 'GET',
@@ -24,20 +22,25 @@ class Unclutter_Dashboard_Controller {
         ]);
     }
 
-    public function permissions_check($request) {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
+
+    public static function get_summary($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
-        return true;
-    }
-    public function get_summary($request) {
         $params = $request->get_params();
-        $result = $this->service->get_summary($params);
-        return rest_ensure_response($result);
+        $params['profile_id'] = $profile_id;
+        $result = Unclutter_Dashboard_Service::get_summary($params);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
-    public function get_trends($request) {
+    public static function get_trends($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
         $params = $request->get_params();
-        $result = $this->service->get_trends($params);
-        return rest_ensure_response($result);
+        $params['profile_id'] = $profile_id;
+        $result = Unclutter_Dashboard_Service::get_trends($params);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 }

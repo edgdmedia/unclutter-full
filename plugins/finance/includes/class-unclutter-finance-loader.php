@@ -22,6 +22,7 @@ class Unclutter_Finance_Loader {
         // Load utils
         require_once UNCLUTTER_FINANCE_PLUGIN_DIR . 'includes/utils/class-unclutter-finance-utils.php';
         // Load models
+        require_once UNCLUTTER_FINANCE_PLUGIN_DIR . 'includes/models/class-unclutter-base-model.php';
         require_once UNCLUTTER_FINANCE_PLUGIN_DIR . 'includes/models/class-unclutter-account-model.php';
         require_once UNCLUTTER_FINANCE_PLUGIN_DIR . 'includes/models/class-unclutter-transaction-model.php';
         require_once UNCLUTTER_FINANCE_PLUGIN_DIR . 'includes/models/class-unclutter-category-model.php';

@@ -10,10 +10,8 @@ if (! defined('ABSPATH')) {
 
 class Unclutter_Transaction_Controller
 {
-    private static $service;
     public static function register_routes()
     {
-        self::$service = new Unclutter_Transaction_Service();
         // Get all transactions
         register_rest_route('api/v1/finance', '/transactions', [
             'methods' => 'GET',
@@ -62,6 +60,48 @@ class Unclutter_Transaction_Controller
             'methods' => 'POST',
             'callback' => [self::class, 'create_transaction'],
             'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'amount' => [
+                    'description' => 'Transaction amount',
+                    'type' => 'number',
+                    'required' => true,
+                ],
+                'type' => [
+                    'description' => 'Transaction type (income or expense)',
+                    'type' => 'string',
+                    'required' => true,
+                ],
+                'transaction_date' => [
+                    'description' => 'Transaction date (YYYY-MM-DD)',
+                    'type' => 'string',
+                    'required' => true,
+                ],
+                'category_id' => [
+                    'description' => 'Category ID',
+                    'type' => 'integer',
+                    'required' => true,
+                ],
+                'account_id' => [
+                    'description' => 'Account ID',
+                    'type' => 'integer',
+                    'required' => true,
+                ],
+                'description' => [
+                    'description' => 'Transaction description',
+                    'type' => 'string',
+                    'required' => false,
+                ],
+                'tags' => [
+                    'description' => 'Array of tag IDs',
+                    'type' => 'array',
+                    'required' => false,
+                ],
+                'attachments' => [
+                    'description' => 'Array of attachment URLs',
+                    'type' => 'array',
+                    'required' => false,
+                ],
+            ]
         ]);
         // Get single transaction
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
@@ -74,61 +114,82 @@ class Unclutter_Transaction_Controller
             'methods' => 'PUT',
             'callback' => [self::class, 'update_transaction'],
             'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'id' => [
+                    'description' => 'Transaction ID',
+                    'type' => 'integer',
+                    'required' => true,
+                ],
+            ]
         ]);
         // Delete transaction
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'DELETE',
             'callback' => [self::class, 'delete_transaction'],
             'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'id' => [
+                    'description' => 'Transaction ID',
+                    'type' => 'integer',
+                    'required' => true,
+                ],
+            ]
         ]);
     }
 
-    public function get_transactions($request)
+    public static function get_transactions($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $params = $request->get_params();
-        $result = $this->service->get_transactions($params);
-        return rest_ensure_response($result);
+        $result = Unclutter_Transaction_Service::get_transactions($profile_id, $params);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 
-    public function get_transaction($request)
+    public static function get_transaction($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $id = (int) $request['id'];
-        $result = $this->service->get_transaction($id);
+        $result = Unclutter_Transaction_Service::get_transaction($profile_id, $id);
         if (!$result) {
             return new WP_Error('not_found', __('Transaction not found.'), array('status' => 404));
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 
-    public function create_transaction($request)
+    public static function create_transaction($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $data = $request->get_json_params();
-        $result = $this->service->create_transaction($data);
+        $data['profile_id'] = $profile_id;
+        $result = Unclutter_Transaction_Service::create_transaction($profile_id, $data);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 
-    public function update_transaction($request)
+    public static function update_transaction($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $id = (int) $request['id'];
         $data = $request->get_json_params();
-        $result = $this->service->update_transaction($id, $data);
+        $data['profile_id'] = $profile_id;
+        $result = Unclutter_Transaction_Service::update_transaction($profile_id, $id, $data);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 
-    public function delete_transaction($request)
+    public static function delete_transaction($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $id = (int) $request['id'];
-        $result = $this->service->delete_transaction($id);
+        $result = Unclutter_Transaction_Service::delete_transaction($profile_id, $id);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response(['deleted' => true]);
+        return new WP_REST_Response(['deleted' => true]);
     }
 }
 

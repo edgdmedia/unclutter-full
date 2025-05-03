@@ -7,29 +7,90 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 class Unclutter_Budget_Service {
-    public static function get_budgets($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
-        $params = $request->get_params();
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        $params['profile_id'] = $profile_id;
-        return Unclutter_Budget_Model::get_budgets($params);
+    /**
+     * Get all budgets
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_budgets($data) {
+        return Unclutter_Budget_Model::get_budgets($data);
     }
-    public static function get_budget($id) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($id);
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        return Unclutter_Budget_Model::get_budget($id);
+    /**
+     * Get a single budget
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_budget($data) {
+        return Unclutter_Budget_Model::get_budget($data);
     }
+
+    /**
+     * Get a single budget by category and period
+     *
+     * @param array $data
+     * @return WP_REST_Response
+     */
+    public static function get_budget_by_category_and_period($data) {
+        return Unclutter_Budget_Model::get_budget_by_category_and_period($data);
+    }
+    /**
+     * Create a new budget
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
     public static function create_budget($data) {
-        return Unclutter_Budget_Model::insert_budget($data);
+        // Validate required fields
+        if (empty($data['category_id']) || !isset($data['amount']) || empty($data['month']) || empty($data['year'])) {
+            return new WP_Error('missing_fields', __('Required fields missing.'), array('status' => 400));
+        }
+        // Check if budget already exists for this category and month/year
+        $existing = Unclutter_Budget_Model::where([
+            'profile_id' => $data['profile_id'],
+            'category_id' => $data['category_id'],
+            'month' => $data['month'],
+            'year' => $data['year']
+        ]);
+        if (!empty($existing) && isset($existing[0]['id'])) {
+            // Update existing budget
+            $id = $existing[0]['id'];
+            Unclutter_Budget_Model::update($id, $data);
+            return $id;
+        }
+        // Insert new budget
+        $result = Unclutter_Budget_Model::insert($data);
+        if ($result) {
+            return Unclutter_Budget_Model::get($result);
+        }
+        return new WP_Error('insert_failed', __('Failed to insert budget.'), array('status' => 500));
     }
-    public static function update_budget($id, $data) {
-        return Unclutter_Budget_Model::update_budget($id, $data);
+    /**
+     * Update a budget
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function update_budget($data) {
+        // Validate required fields
+        if (empty($data['category_id']) || !isset($data['amount']) || empty($data['month']) || empty($data['year'])) {
+            return new WP_Error('missing_fields', __('Required fields missing.'), array('status' => 400));
+        }
+        return Unclutter_Budget_Model::update_budget($data['id'], $data);
     }
-    public static function delete_budget($id) {
+    /**
+     * Delete a budget
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function delete_budget($request) {
+        $id = (int) $request['id'];
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
         return Unclutter_Budget_Model::delete_budget($id);
     }
 }

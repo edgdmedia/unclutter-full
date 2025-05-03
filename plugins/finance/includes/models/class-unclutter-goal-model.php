@@ -6,11 +6,14 @@ if (!defined('ABSPATH')) exit;
  * 
  * Handles all database interactions for savings goals
  */
-class Unclutter_Goal_Model {
+class Unclutter_Goal_Model extends Unclutter_Base_Model {
+    protected static $fillable = [
+        'profile_id', 'name', 'target_amount', 'current_amount', 'start_date', 'target_date', 'status', 'goal_type', 'income_percentage', 'account_id', 'notes', 'created_at', 'updated_at'
+    ];
     /**
      * Get table name
      */
-    private static function get_table_name() {
+    protected static function get_table_name() {
         global $wpdb;
         return $wpdb->prefix . 'unclutter_finance_goals';
     }
@@ -128,33 +131,34 @@ class Unclutter_Goal_Model {
         global $wpdb;
         $table = self::get_table_name();
         $accounts_table = $wpdb->prefix . 'unclutter_finance_accounts';
-        
-        $query = "SELECT g.*, a.name as account_name 
-                 FROM $table g 
-                 LEFT JOIN $accounts_table a ON g.account_id = a.id";
-        $params = [];
-        
+        // profile_id is required
+        if (empty($args['profile_id'])) {
+            return [];
+        }
+        $query = "SELECT g.*, a.name as account_name FROM $table g LEFT JOIN $accounts_table a ON g.account_id = a.id WHERE g.profile_id = %d";
+        $params = [(int)$args['profile_id']];
         // Add status filter if provided
         if (isset($args['status'])) {
             $query .= " AND g.status = %s";
             $params[] = $args['status'];
         }
-        
         // Add account_id filter if provided
         if (isset($args['account_id'])) {
             $query .= " AND g.account_id = %d";
             $params[] = $args['account_id'];
         }
-        
         // Add goal_type filter if provided
         if (isset($args['goal_type'])) {
             $query .= " AND g.goal_type = %s";
             $params[] = $args['goal_type'];
         }
-        
+        // Add name filter if provided (for goal_exists)
+        if (isset($args['name'])) {
+            $query .= " AND g.name = %s";
+            $params[] = $args['name'];
+        }
         // Add order by
         $query .= " ORDER BY g.target_date ASC";
-        
         return $wpdb->get_results($wpdb->prepare($query, $params));
     }
     
@@ -170,11 +174,15 @@ class Unclutter_Goal_Model {
         $table = self::get_table_name();
         $accounts_table = $wpdb->prefix . 'unclutter_finance_accounts';
         
+        if (empty($profile_id)) {
+            return [];
+        }
+        
         $query = "SELECT g.*, a.name as account_name 
                  FROM $table g 
                  LEFT JOIN $accounts_table a ON g.account_id = a.id 
                  WHERE g.profile_id = %d";
-        $params = [$profile_id];
+        $params = [(int)$profile_id];
         
         // Add status filter if provided
         if (isset($args['status'])) {

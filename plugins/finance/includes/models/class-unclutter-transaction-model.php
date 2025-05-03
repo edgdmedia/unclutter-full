@@ -6,11 +6,14 @@ if (!defined('ABSPATH')) exit;
  * 
  * Handles all database interactions for financial transactions
  */
-class Unclutter_Transaction_Model {
+class Unclutter_Transaction_Model extends Unclutter_Base_Model {
+    protected static $fillable = [
+        'profile_id', 'account_id', 'category_id', 'amount', 'transaction_date', 'type', 'notes', 'created_at', 'updated_at'
+    ];
     /**
      * Get table name
      */
-    private static function get_table_name() {
+    protected static function get_table_name() {
         global $wpdb;
         return $wpdb->prefix . 'unclutter_finance_transactions';
     }
@@ -39,7 +42,7 @@ class Unclutter_Transaction_Model {
      * @param array $attachments Optional array of attachment URLs
      * @return int|false The transaction ID on success, false on failure
      */
-    public static function insert_transaction($data, $tags = [], $attachments = []) {
+    public static function insert_transaction($data) {
         global $wpdb;
         $table = self::get_table_name();
         
@@ -81,16 +84,6 @@ class Unclutter_Transaction_Model {
             
             if (!$account_updated) {
                 throw new Exception('Failed to update account balance');
-            }
-            
-            // Add tags if provided
-            if (!empty($tags)) {
-                self::add_tags_to_transaction($transaction_id, $tags);
-            }
-            
-            // Add attachments if provided
-            if (!empty($attachments)) {
-                self::add_attachments_to_transaction($transaction_id, $attachments);
             }
             
             // Commit transaction
@@ -213,7 +206,7 @@ class Unclutter_Transaction_Model {
      * @param int $id Transaction ID
      * @return bool True on success, false on failure
      */
-    public static function delete_transaction($id) {
+    public static function delete_transaction($profile_id, $id) {
         global $wpdb;
         $table = self::get_table_name();
         $tags_table = self::get_tags_table_name();
@@ -224,7 +217,7 @@ class Unclutter_Transaction_Model {
         
         try {
             // Get current transaction data for balance adjustment
-            $transaction = self::get_transaction($id);
+            $transaction = self::get_transaction($profile_id, $id);
             
             if (!$transaction) {
                 throw new Exception('Transaction not found');
@@ -247,10 +240,10 @@ class Unclutter_Transaction_Model {
             }
             
             // Delete transaction tags
-            $wpdb->delete($tags_table, ['transaction_id' => $id]);
+            $wpdb->delete($tags_table, ['transaction_id' => $profile_id, $id]);
             
             // Delete transaction attachments
-            $wpdb->delete($attachments_table, ['transaction_id' => $id]);
+            $wpdb->delete($attachments_table, ['transaction_id' => $profile_id, $id]);
             
             // Delete transaction
             $result = $wpdb->delete($table, ['id' => $id]);
@@ -276,7 +269,7 @@ class Unclutter_Transaction_Model {
      * @param int $id Transaction ID
      * @return object|null Transaction object or null if not found
      */
-    public static function get_transaction($id) {
+    public static function get_transaction($profile_id, $id) {
         global $wpdb;
         $table = self::get_table_name();
         $accounts_table = $wpdb->prefix . 'unclutter_finance_accounts';
@@ -289,17 +282,10 @@ class Unclutter_Transaction_Model {
              FROM $table t 
              LEFT JOIN $accounts_table a ON t.account_id = a.id 
              LEFT JOIN $categories_table c ON t.category_id = c.id 
-             WHERE t.id = %d",
-            $id
+             WHERE t.id = %d AND t.profile_id = %d",
+            $id,
+            $profile_id
         ));
-        
-        if ($transaction) {
-            // Get tags
-            $transaction->tags = self::get_transaction_tags($id);
-            
-            // Get attachments
-            $transaction->attachments = self::get_transaction_attachments($id);
-        }
         
         return $transaction;
     }
@@ -729,6 +715,35 @@ class Unclutter_Transaction_Model {
         ));
     }
     
+    /**
+     * Get income or expenses by account for a profile within a date range
+     *
+     * @param int $profile_id Profile ID
+     * @param string $type Transaction type ('income' or 'expense')
+     * @param string $start_date Start date (YYYY-MM-DD)
+     * @param string $end_date End date (YYYY-MM-DD)
+     * @return array Array of account totals
+     */
+    public static function get_totals_by_account($profile_id, $type, $start_date, $end_date) {
+        global $wpdb;
+        $table = self::get_table_name();
+        $accounts_table = $wpdb->prefix . 'unclutter_finance_accounts';
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT t.account_id, a.name as account_name, SUM(t.amount) as total 
+             FROM $table t 
+             JOIN $accounts_table a ON t.account_id = a.id 
+             WHERE t.profile_id = %d 
+             AND t.type = %s 
+             AND t.transaction_date BETWEEN %s AND %s 
+             GROUP BY t.account_id 
+             ORDER BY total DESC",
+            $profile_id,
+            $type,
+            $start_date,
+            $end_date
+        ));
+    }
+
     /**
      * Get income and expenses by date for a profile within a date range
      * 

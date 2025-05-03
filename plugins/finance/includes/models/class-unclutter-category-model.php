@@ -7,11 +7,14 @@ if (!defined('ABSPATH')) exit;
  * Handles all database interactions for the unified categories table
  * This includes account types, income categories, expense categories, tags, etc.
  */
-class Unclutter_Category_Model {
+class Unclutter_Category_Model extends Unclutter_Base_Model {
+    protected static $fillable = [
+        'profile_id', 'name', 'type', 'parent_id', 'is_active', 'created_at', 'updated_at'
+    ];
     /**
      * Get table name
      */
-    private static function get_table_name() {
+    protected static function get_table_name() {
         global $wpdb;
         return $wpdb->prefix . 'unclutter_finance_categories';
     }

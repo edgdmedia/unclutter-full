@@ -9,6 +9,29 @@ if (!defined('ABSPATH')) exit;
 class Unclutter_Category_Controller {
 
     public static function register_routes() {
+        // ...existing routes...
+
+        // Get a single category with details (budget + spend)
+        register_rest_route('api/v1/finance', '/categories/(?P<id>\d+)/details', [
+            'methods' => 'GET',
+            'callback' => [self::class, 'get_category_details'],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'month' => [
+                    'required' => false,
+                    'validate_callback' => function($param) {
+                        return is_numeric($param) && $param >= 1 && $param <= 12;
+                    },
+                ],
+                'year' => [
+                    'required' => false,
+                    'validate_callback' => function($param) {
+                        return is_numeric($param) && $param >= 2000 && $param <= 2100;
+                    },
+                ],
+            ],
+        ]);
+
         // Get all categories by type
         register_rest_route('api/v1/finance', '/categories', [
             'methods' => 'GET',
@@ -64,13 +87,13 @@ class Unclutter_Category_Controller {
                 'parent_id' => [
                     'required' => false,
                     'validate_callback' => function($param) {
-                        return is_numeric($param);
+                        return is_numeric($param) || $param === null || $param === '';
                     },
                 ],
                 'description' => [
                     'required' => false,
                     'validate_callback' => function($param) {
-                        return is_string($param);
+                        return is_string($param) || $param === null || $param === '';
                     },
                 ],
             ],
@@ -202,9 +225,74 @@ class Unclutter_Category_Controller {
             }
         }
         
-        return new WP_REST_Response(['success' => true, 'categories' => $categories], 200);
+        return new WP_REST_Response(['success' => true, 'data' => $categories], 200);
     }
     
+    /**
+     * Get a single category with details (budget, totals, paginated transactions)
+     *
+     * Query params:
+     * - month, year: period to query
+     * - page: page number for transaction pagination (default 1)
+     * - per_page: transactions per page (default 20)
+     *
+     * Returns:
+     * - category (with children)
+     * - budget
+     * - total_income
+     * - total_expense
+     * - transactions[] (paginated)
+     * - transactions_pagination: {total, page, per_page, total_pages}
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_category_details($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        $id = $request->get_param('id');
+        $month = $request->get_param('month');
+        $year = $request->get_param('year');
+        $page = (int)$request->get_param('page');
+        $per_page = (int)$request->get_param('per_page');
+        $result = Unclutter_Category_Service::get_category_details($id, $profile_id, $month, $year, $page, $per_page);
+        return new WP_REST_Response([
+            'success' => $result['success'],
+            'data' => $result['data'],
+            'message' => $result['message']
+        ], $result['status']);
+    }
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        $id = $request->get_param('id');
+        $month = $request->get_param('month');
+        $year = $request->get_param('year');
+        $result = Unclutter_Category_Service::get_category_details($id, $profile_id, $month, $year);
+        return new WP_REST_Response([
+            'success' => $result['success'],
+            'data' => $result['data'],
+            'message' => $result['message']
+        ], $result['status']);
+    }
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        $id = $request->get_param('id');
+        $month = $request->get_param('month');
+        $year = $request->get_param('year');
+        $result = Unclutter_Category_Service::get_category_with_budget($id, $profile_id, $month, $year);
+        return new WP_REST_Response([
+            'success' => $result['success'],
+            'data' => $result['data'],
+            'message' => $result['message']
+        ], $result['status']);
+    }
+
     /**
      * Get a single category
      * 
@@ -216,23 +304,14 @@ class Unclutter_Category_Controller {
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
-        
+
         $id = $request->get_param('id');
-        $category = Unclutter_Category_Model::get_category($id);
-        
-        if (!$category) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Category not found'], 404);
-        }
-        
-        // Check if the category belongs to the user or is a system category (profile_id = 0)
-        if ($category->profile_id != $profile_id && $category->profile_id != 0) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        
-        // Get child categories
-        $category->children = Unclutter_Category_Model::get_child_categories($category->id);
-        
-        return new WP_REST_Response(['success' => true, 'category' => $category], 200);
+        $result = Unclutter_Category_Service::get_category($id, $profile_id);
+        return new WP_REST_Response([
+            'success' => $result['success'],
+            'data' => $result['data'],
+            'message' => $result['message']
+        ], $result['status']);
     }
     
     /**

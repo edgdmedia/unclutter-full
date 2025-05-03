@@ -145,6 +145,249 @@ class Unclutter_Category_Service {
      * @param int $profile_id Profile ID
      * @return bool True if the category belongs to the profile or is a system category
      */
+    /**
+     * Get a single category with children, checking profile authorization
+     *
+     * @param int $category_id
+     * @param int $profile_id
+     * @return array [success, data, message, status]
+     */
+    public static function get_category($category_id, $profile_id) {
+
+    /**
+     * Get a single category with children and budget details
+     *
+     * @param int $category_id
+     * @param int $profile_id
+     * @param int|null $month
+     * @param int|null $year
+     * @return array [success, data, message, status]
+     */
+    public static function get_category_details($category_id, $profile_id, $month = null, $year = null, $page = 1, $per_page = 20) {
+        $category_result = self::get_category($category_id, $profile_id);
+        if (!$category_result['success']) {
+            return $category_result;
+        }
+        $category = $category_result['data'];
+        // Default to current month/year if not provided
+        if (!$month) $month = (int)date('n');
+        if (!$year) $year = (int)date('Y');
+        if (!$page || $page < 1) $page = 1;
+        if (!$per_page || $per_page < 1) $per_page = 20;
+        // Fetch the budget for this category/profile/month/year
+        $budget = null;
+        if (class_exists('Unclutter_Budget_Model')) {
+            $budget = Unclutter_Budget_Model::get_budget_by_category_and_period([
+                'profile_id' => $profile_id,
+                'category_id' => $category_id,
+                'month' => $month,
+                'year' => $year
+            ]);
+        }
+        // Prepare date range
+        $start_date = sprintf('%04d-%02d-01', $year, $month);
+        $end_date = date('Y-m-t', strtotime($start_date));
+        // Always compute both totals
+        $total_income = 0.0;
+        $total_expense = 0.0;
+        $transactions = [];
+        $type = isset($category->type) ? $category->type : null;
+        if (class_exists('Unclutter_Transaction_Model')) {
+            $total_income = Unclutter_Transaction_Model::get_total_income($profile_id, $start_date, $end_date);
+            $total_expense = Unclutter_Transaction_Model::get_total_expenses($profile_id, $start_date, $end_date);
+            // Fetch all transactions for this category/period
+            $all_transactions = Unclutter_Transaction_Model::get_transactions_by_profile($profile_id, [
+                'category_id' => $category_id,
+                'start_date' => $start_date,
+                'end_date' => $end_date
+            ]);
+            $total = count($all_transactions);
+            $total_pages = (int)ceil($total / $per_page);
+            $offset = ($page - 1) * $per_page;
+            $transactions = array_slice($all_transactions, $offset, $per_page);
+        } else {
+            $total = 0;
+            $total_pages = 1;
+        }
+        $category->budget = $budget;
+        $category->total_income = (float)$total_income;
+        $category->total_expense = (float)$total_expense;
+        $category->transactions = $transactions;
+        $category->transactions_pagination = [
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $per_page,
+            'total_pages' => $total_pages
+        ];
+        return [
+            'success' => true,
+            'data' => $category,
+            'message' => '',
+            'status' => 200
+        ];
+    }
+        $category_result = self::get_category($category_id, $profile_id);
+        if (!$category_result['success']) {
+            return $category_result;
+        }
+        $category = $category_result['data'];
+        // Default to current month/year if not provided
+        if (!$month) $month = (int)date('n');
+        if (!$year) $year = (int)date('Y');
+        // Fetch the budget for this category/profile/month/year
+        $budget = null;
+        if (class_exists('Unclutter_Budget_Model')) {
+            $budget = Unclutter_Budget_Model::get_budget_by_category_and_period([
+                'profile_id' => $profile_id,
+                'category_id' => $category_id,
+                'month' => $month,
+                'year' => $year
+            ]);
+        }
+        // Prepare date range
+        $start_date = sprintf('%04d-%02d-01', $year, $month);
+        $end_date = date('Y-m-t', strtotime($start_date));
+        // Detect category type and fetch totals/transactions
+        $total = 0.0;
+        $transactions = [];
+        $type = isset($category->type) ? $category->type : null;
+        if (class_exists('Unclutter_Transaction_Model')) {
+            if ($type === 'income') {
+                // Total income
+                $total = Unclutter_Transaction_Model::get_total_income($profile_id, $start_date, $end_date);
+                // All income transactions for this category/period
+                $transactions = Unclutter_Transaction_Model::get_transactions_by_profile($profile_id, [
+                    'category_id' => $category_id,
+                    'type' => 'income',
+                    'start_date' => $start_date,
+                    'end_date' => $end_date
+                ]);
+            } elseif ($type === 'expense') {
+                // Total expense
+                $total = Unclutter_Transaction_Model::get_total_expenses($profile_id, $start_date, $end_date);
+                // All expense transactions for this category/period
+                $transactions = Unclutter_Transaction_Model::get_transactions_by_profile($profile_id, [
+                    'category_id' => $category_id,
+                    'type' => 'expense',
+                    'start_date' => $start_date,
+                    'end_date' => $end_date
+                ]);
+            } else {
+                // For other types, fetch all transactions for this category/period
+                $transactions = Unclutter_Transaction_Model::get_transactions_by_profile($profile_id, [
+                    'category_id' => $category_id,
+                    'start_date' => $start_date,
+                    'end_date' => $end_date
+                ]);
+            }
+        }
+        $category->budget = $budget;
+        $category->total = (float)$total;
+        $category->transactions = $transactions;
+        return [
+            'success' => true,
+            'data' => $category,
+            'message' => '',
+            'status' => 200
+        ];
+    }
+        $category_result = self::get_category($category_id, $profile_id);
+        if (!$category_result['success']) {
+            return $category_result;
+        }
+        $category = $category_result['data'];
+        // Default to current month/year if not provided
+        if (!$month) $month = (int)date('n');
+        if (!$year) $year = (int)date('Y');
+        // Fetch the budget for this category/profile/month/year
+        $budget = null;
+        if (class_exists('Unclutter_Budget_Model')) {
+            $budget = Unclutter_Budget_Model::get_budget_by_category_and_period([
+                'profile_id' => $profile_id,
+                'category_id' => $category_id,
+                'month' => $month,
+                'year' => $year
+            ]);
+        }
+        // Fetch total spent for this category/profile/month/year
+        $spend = 0.0;
+        if (class_exists('Unclutter_Transaction_Model')) {
+            global $wpdb;
+            $transactions_table = Unclutter_Transaction_Model::get_table_name();
+            $start_date = sprintf('%04d-%02d-01', $year, $month);
+            $end_date = date('Y-m-t', strtotime($start_date));
+            $spend = $wpdb->get_var($wpdb->prepare(
+                "SELECT SUM(amount) FROM $transactions_table WHERE profile_id = %d AND category_id = %d AND type = 'expense' AND transaction_date BETWEEN %s AND %s",
+                $profile_id,
+                $category_id,
+                $start_date,
+                $end_date
+            ));
+            if (!$spend) $spend = 0.0;
+        }
+        $category->budget = $budget;
+        $category->spend = (float)$spend;
+        return [
+            'success' => true,
+            'data' => $category,
+            'message' => '',
+            'status' => 200
+        ];
+    }
+        $category_result = self::get_category($category_id, $profile_id);
+        if (!$category_result['success']) {
+            return $category_result;
+        }
+        $category = $category_result['data'];
+        // Default to current month/year if not provided
+        if (!$month) $month = (int)date('n');
+        if (!$year) $year = (int)date('Y');
+        // Fetch the budget for this category/profile/month/year
+        $budget = null;
+        if (class_exists('Unclutter_Budget_Model')) {
+            $budget = Unclutter_Budget_Model::get_budget_by_category_and_period([
+                'profile_id' => $profile_id,
+                'category_id' => $category_id,
+                'month' => $month,
+                'year' => $year
+            ]);
+        }
+        $category->budget = $budget;
+        return [
+            'success' => true,
+            'data' => $category,
+            'message' => '',
+            'status' => 200
+        ];
+    }
+        $category = Unclutter_Category_Model::get_category($category_id);
+        if (!$category) {
+            return [
+                'success' => false,
+                'data' => null,
+                'message' => 'Category not found',
+                'status' => 404
+            ];
+        }
+        // Check if the category belongs to the user or is a system category (profile_id = 0)
+        if ($category->profile_id != $profile_id && $category->profile_id != 0) {
+            return [
+                'success' => false,
+                'data' => null,
+                'message' => 'Unauthorized',
+                'status' => 401
+            ];
+        }
+        // Get child categories
+        $category->children = Unclutter_Category_Model::get_child_categories($category->id);
+        return [
+            'success' => true,
+            'data' => $category,
+            'message' => '',
+            'status' => 200
+        ];
+    }
+
     public static function category_belongs_to_profile($category_id, $profile_id) {
         $category = Unclutter_Category_Model::get_category($category_id);
         

@@ -37,8 +37,14 @@ class Unclutter_Transaction_Service {
      * @param int $id Transaction ID
      * @return object|null Transaction object or null if not found
      */
-    public static function get_transaction($id) {
-        return Unclutter_Transaction_Model::get_transaction($id);
+    public static function get_transaction($profile_id, $id) {
+        $transaction = Unclutter_Transaction_Model::get_transaction($profile_id, $id);
+        if (!$transaction) {
+            return new WP_Error('not_found', __('Transaction not found.'), array('status' => 404));
+        }
+        $transaction->tags = Unclutter_Transaction_Model::get_transaction_tags($id);
+        $transaction->attachments = Unclutter_Transaction_Model::get_transaction_attachments($id);
+        return $transaction;
     }
     
     /**
@@ -50,23 +56,45 @@ class Unclutter_Transaction_Service {
      * @param array $attachments Optional array of attachment URLs
      * @return int|false Transaction ID on success, false on failure
      */
-    public static function create_transaction($profile_id, $data, $tags = [], $attachments = []) {
-        // Ensure profile_id is set
-        $data['profile_id'] = $profile_id;
-        
-        // Insert transaction
-        $transaction_id = Unclutter_Transaction_Model::insert_transaction($data, $tags, $attachments);
-        
-        // Update percentage-based goals if this is an income transaction
-        if ($transaction_id && $data['type'] === 'income') {
-            Unclutter_Goal_Model::update_percentage_goals_from_income(
-                $profile_id, 
-                $data['amount'], 
-                $data['category_id']
-            );
+    /**
+     * Create a new transaction for a profile
+     * @param int $profile_id
+     * @param array $data
+     * @return array|WP_Error
+     */
+    public static function create_transaction($profile_id, $data) {
+        // Validate required fields
+        if (empty($data['amount']) || empty($data['type']) || empty($data['transaction_date'])) {
+            return new WP_Error('missing_fields', 'Required fields: amount, type, transaction_date.');
         }
-        
-        return $transaction_id;
+        $data['profile_id'] = $profile_id;
+
+        // Extract tags and attachments, remove from $data
+        $tags = isset($data['tags']) ? $data['tags'] : [];
+        unset($data['tags']);
+        $attachments = isset($data['attachments']) ? $data['attachments'] : [];
+        unset($data['attachments']);
+
+        // Insert transaction (only the main transaction fields)
+        $transaction_id = Unclutter_Transaction_Model::insert_transaction($data);
+        if (!$transaction_id) {
+            return new WP_Error('db_error', 'Could not create transaction.');
+        }
+        // Add tags if provided
+        if (!empty($tags)) {
+            $success = Unclutter_Transaction_Model::add_tags_to_transaction($transaction_id, $tags);
+            if (!$success) {
+                return new WP_Error('db_error', 'Transaction created, but failed to add tags.');
+            }
+        }
+        // Add attachments if provided
+        if (!empty($attachments)) {
+            $success = Unclutter_Transaction_Model::add_attachments_to_transaction($transaction_id, $attachments);
+            if (!$success) {
+                return new WP_Error('db_error', 'Transaction created, but failed to add attachments.');
+            }
+        }
+        return Unclutter_Transaction_Model::get_transaction($transaction_id);
     }
     
     /**
@@ -78,9 +106,9 @@ class Unclutter_Transaction_Service {
      * @param array $attachments Optional array of attachment URLs
      * @return bool True on success, false on failure
      */
-    public static function update_transaction($id, $data, $tags = null, $attachments = []) {
+    public static function update_transaction($profile_id, $id, $data, $tags = null, $attachments = []) {
         // Get the original transaction for comparison
-        $original = Unclutter_Transaction_Model::get_transaction($id);
+        $original = Unclutter_Transaction_Model::get_transaction($profile_id, $id);
         
         // Update transaction
         $updated = Unclutter_Transaction_Model::update_transaction($id, $data, $tags, $attachments);
@@ -92,7 +120,7 @@ class Unclutter_Transaction_Service {
             (isset($data['amount']) || isset($data['category_id']))) {
             
             // Get the updated transaction
-            $transaction = Unclutter_Transaction_Model::get_transaction($id);
+            $transaction = Unclutter_Transaction_Model::get_transaction($profile_id, $id);
             
             if ($transaction->type === 'income') {
                 // If the amount changed, update goals based on the difference
@@ -126,16 +154,16 @@ class Unclutter_Transaction_Service {
      * @param int $id Transaction ID
      * @return bool True on success, false on failure
      */
-    public static function delete_transaction($id) {
+    public static function delete_transaction($profile_id, $id) {
         // Get the transaction before deleting it
-        $transaction = Unclutter_Transaction_Model::get_transaction($id);
+        $transaction = Unclutter_Transaction_Model::get_transaction($profile_id, $id);
         
         if (!$transaction) {
             return false;
         }
         
         // Delete transaction
-        $deleted = Unclutter_Transaction_Model::delete_transaction($id);
+        $deleted = Unclutter_Transaction_Model::delete_transaction($profile_id, $id);
         
         // Update percentage-based goals if this was an income transaction
         if ($deleted && $transaction->type === 'income') {

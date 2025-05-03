@@ -7,9 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 class Unclutter_Goal_Controller {
-    private static $service;
     public static function register_routes() {
-        self::$service = new Unclutter_Goal_Service();
         // Get all goals
         register_rest_route('api/v1/finance', '/goals', [
             'methods' => 'GET',
@@ -42,42 +40,49 @@ class Unclutter_Goal_Controller {
         ]);
     }
 
-    public function get_goals($request) {
+    public static function get_goals($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $params = $request->get_params();
+        $params['profile_id'] = $profile_id;
         $result = Unclutter_Goal_Service::get_goals($params);
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
-    public function get_goal($request) {
+    public static function get_goal($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $id = (int) $request['id'];
         $result = Unclutter_Goal_Service::get_goal($id);
         if (!$result) {
             return new WP_Error('not_found', __('Goal not found.'), array('status' => 404));
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
-    public function create_goal($request) {
+    public static function create_goal($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $data = $request->get_json_params();
-        $result = $this->service->create_goal($data);
+        $data['profile_id'] = $profile_id;
+        $result = Unclutter_Goal_Service::create_goal($data);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
     public function update_goal($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $id = (int) $request['id'];
         $data = $request->get_json_params();
         $result = Unclutter_Goal_Service::update_goal($id, $data);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
-    public function delete_goal($request) {
+    public static function delete_goal($request) {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $id = (int) $request['id'];
-        $result = $this->service->delete_goal($id);
+        $result = Unclutter_Goal_Service::delete_goal($id);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response(['deleted' => true]);
+        return new WP_REST_Response(['deleted' => true], 200);
     }
 }

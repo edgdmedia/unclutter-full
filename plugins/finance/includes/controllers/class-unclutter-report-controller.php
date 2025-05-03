@@ -9,10 +9,8 @@ if (! defined('ABSPATH')) {
 }
 class Unclutter_Report_Controller
 {
-    private static $service;
     public static function register_routes()
-    {
-        self::$service = new Unclutter_Report_Service();    
+    {  
         // Summary report
         register_rest_route('api/v1/finance', '/reports/summary', [
             'methods' => 'GET',
@@ -31,54 +29,30 @@ class Unclutter_Report_Controller
             'callback' => [self::class, 'get_by_account'],
             'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
         ]);
-
-
-        register_rest_route('api/v1/finance', '/reports/summary', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_summary'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
-            ]
-        ]);
-        register_rest_route('api/v1/finance', '/reports/by-category', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_by_category'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
-            ]
-        ]);
-        register_rest_route('api/v1/finance', '/reports/by-account', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_by_account'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
-            ]
-        ]);
     }
 
-    public function permissions_check($request)
+    public static function get_summary($request)
     {
-        if (!is_user_logged_in()) {
-            return new WP_Error('rest_forbidden', __('You are not authorized.'), array('status' => 401));
-        }
-        return true;
-    }
-    public function get_summary($request)
-    {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $params = $request->get_params();
-        $result = $this->service->get_summary($params);
-        return rest_ensure_response($result);
+        $params['profile_id'] = $profile_id;
+        $result = Unclutter_Report_Service::get_summary($params);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
-    public function get_by_category($request)
-    {
+    public static function get_by_category($request)
+    {   
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $params = $request->get_params();
-        $result = $this->service->get_by_category($params);
-        return rest_ensure_response($result);
+        $params['profile_id'] = $profile_id;
+        $result = Unclutter_Report_Service::get_by_category($params);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
-    public function get_by_account($request)
+    public static function get_by_account($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $params = $request->get_params();
-        $result = $this->service->get_by_account($params);
-        return rest_ensure_response($result);
+        $params['profile_id'] = $profile_id;
+        $result = Unclutter_Report_Service::get_by_account($params);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 }

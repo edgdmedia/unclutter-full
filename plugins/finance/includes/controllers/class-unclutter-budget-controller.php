@@ -18,6 +18,22 @@ class Unclutter_Budget_Controller
             'methods' => 'GET',
             'callback' => [self::class, 'get_budgets'],
             'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'args' => [
+                'month' => [
+                    'required' => false,
+                    'default' => date('n'),
+                    'validate_callback' => function($param, $request, $key) {
+                        return $param === '' || is_null($param) || is_numeric($param);
+                    },
+                ],
+                'year' => [
+                    'required' => false,
+                    'default' => date('Y'),
+                    'validate_callback' => function($param, $request, $key) {
+                        return $param === '' || is_null($param) || is_numeric($param);
+                    },
+                ],
+            ],
         ]);
         // Create budget
         register_rest_route('api/v1/finance', '/budgets', [
@@ -38,15 +54,20 @@ class Unclutter_Budget_Controller
                     },
                 ],
                 'month' => [
-                    'required' => true,
+                    'default' => date('n'),
                     'validate_callback' => function($param, $request, $key) {
-                        return is_numeric($param);
+                        return $param === '' || is_null($param) || is_numeric($param);
                     },
                 ],
                 'year' => [
-                    'required' => true,
+                    'default' => date('Y'),
                     'validate_callback' => function($param, $request, $key) {
-                        return is_numeric($param);
+                        return $param === '' || is_null($param) || is_numeric($param);
+                    },
+                ],
+                'notes' => [
+                    'validate_callback' => function($param, $request, $key) {
+                        return $param === '' || is_null($param) || is_string($param);
                     },
                 ],
             ],
@@ -55,15 +76,7 @@ class Unclutter_Budget_Controller
         register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_budget'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
-            'args' => [
-                'id' => [
-                    'required' => true,
-                    'validate_callback' => function($param, $request, $key) {
-                        return is_numeric($param);
-                    },
-                ],
-            ],
+            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required']
         ]);
         //Get Budget by category and period
         register_rest_route('api/v1/finance', '/budgets/category/(?P<category_id>\\d+)/(?P<month>\\d+)/(?P<year>\\d+)', [
@@ -90,28 +103,37 @@ class Unclutter_Budget_Controller
                     },
                 ],
             ],
-        ]);
-        // Update budget
-        register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
-            'methods' => 'PUT',
-            'callback' => [self::class, 'update_budget'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
-            'args' => [
-                'id' => [
-                    'required' => true,
-                    'validate_callback' => function($param, $request, $key) {
-                        return is_numeric($param);
-                    },
-                ],
-            ],
-        ]);
-        // Delete budget
-        register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
-            'methods' => 'DELETE',
-            'callback' => [self::class, 'delete_budget'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
-        ]);
+        ]); 
     }
+
+    /**
+     * Get budget by category and period
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response
+     */
+    public static function get_budget_by_category_and_period($request)
+    {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $category_id = $request['category_id'];
+        $month = $request['month'];
+        $year = $request['year'];
+        $data = [
+            'profile_id' => $profile_id,
+            'category_id' => $category_id,
+            'month' => $month,
+            'year' => $year
+        ];
+        $result = Unclutter_Budget_Service::get_budget_by_category_and_period($data);
+        if (!$result) {
+            return new WP_Error('not_found', __('Budget not found for this category and period.'), array('status' => 404));
+        }
+        return new WP_REST_Response([
+            'success' => true,
+            'data' => $result
+        ], 200);
+    }
+
 
     /**
      * Authentication check
@@ -137,8 +159,13 @@ class Unclutter_Budget_Controller
      */
     public static function get_budgets($request)
     {
-        $result = Unclutter_Budget_Service::get_budgets($request);
-        return new WP_REST_Response($result, 200);
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $data['profile_id'] = $profile_id;
+        $result = Unclutter_Budget_Service::get_budgets($data);
+        return new WP_REST_Response([
+            'success' => true,
+            'data' => $result
+        ], 200);
     }
     /**
      * Get a single budget
@@ -146,14 +173,19 @@ class Unclutter_Budget_Controller
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
-    public function get_budget($request)
+    public static function get_budget($request)
     {
-        $id = (int) $request['id'];
-        $result = Unclutter_Budget_Service::get_budget($id);
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $data['id'] = $request['id'];
+        $data['profile_id'] = $profile_id;
+        $result = Unclutter_Budget_Service::get_budget($data);
         if (!$result) {
             return new WP_Error('not_found', __('Budget not found.'), array('status' => 404));
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response([
+            'success' => true,
+            'data' => $result
+        ], 200);
     }
     /**
      * Create a new budget
@@ -163,12 +195,17 @@ class Unclutter_Budget_Controller
      */
     public static function create_budget($request)
     {
+        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
         $data = $request->get_json_params();
+        $data['profile_id'] = $profile_id;
         $result = Unclutter_Budget_Service::create_budget($data);
         if (is_wp_error($result)) {
             return $result;
         }
-        return rest_ensure_response($result);
+        return new WP_REST_Response([
+            'success' => true,
+            'data' => $result
+        ], 200);
     }
     /**
      * Update an existing budget
