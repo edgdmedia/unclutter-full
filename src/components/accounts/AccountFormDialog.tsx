@@ -39,17 +39,18 @@ interface AccountFormDialogProps {
   initialAccount?: {
     id: string;
     name: string;
-    type: string;
+    type_id: number;
     institution: string;
     balance: number;
     notes?: string;
   } | null;
+  onSubmit: (values: any) => void;
 }
 
 const formSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(2, { message: 'Account name is required' }),
-  type: z.string().min(1, { message: 'Account type is required' }),
+  type_id: z.string().min(1, { message: 'Account type is required' }),
   institution: z.string().min(1, { message: 'Institution is required' }),
   balance: z.coerce.number(),
   notes: z.string().optional(),
@@ -59,15 +60,24 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
   open,
   onOpenChange,
   initialAccount,
+  onSubmit
 }) => {
-  const { categories } = useFinance();
-  const accountTypes = categories.filter(cat => cat.type === 'account');
+  const { categories, fetchCategories } = useFinance();
+  const accountTypes = categories.filter(cat => cat.type === 'account_type');
+  
+  // Fetch categories when the dialog opens
+  useEffect(() => {
+    if (open && (!categories || categories.length === 0)) {
+      console.log('Fetching categories for account form');
+      fetchCategories();
+    }
+  }, [open, categories, fetchCategories]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      type: '',
+      type_id: '',
       institution: '',
       balance: 0,
       notes: '',
@@ -79,7 +89,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
       form.reset({
         id: initialAccount.id,
         name: initialAccount.name,
-        type: initialAccount.type,
+        type_id: initialAccount.type_id || initialAccount.type, // Handle both type_id and legacy type
         institution: initialAccount.institution,
         balance: initialAccount.balance,
         notes: initialAccount.notes || '',
@@ -87,7 +97,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
     } else {
       form.reset({
         name: '',
-        type: '',
+        type_id: '',
         institution: '',
         balance: 0,
         notes: '',
@@ -95,12 +105,9 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
     }
   }, [initialAccount, form]);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-    toast.success(
-      initialAccount ? 'Account updated successfully!' : 'Account added successfully!'
-    );
-    onOpenChange(false);
+  const handleSubmit = (values: z.infer<typeof formSchema>) => {
+    console.log('Submitting account form:', values);
+    onSubmit(values);
   };
 
   return (
@@ -115,7 +122,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -132,7 +139,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="type"
+                name="type_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Account Type</FormLabel>
@@ -146,11 +153,22 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {accountTypes.map(type => (
-                          <SelectItem key={type.id} value={type.name.toLowerCase()}>
-                            {type.name}
-                          </SelectItem>
-                        ))}
+                        {accountTypes.length > 0 ? (
+                          accountTypes.map(type => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="1">Checking</SelectItem>
+                            <SelectItem value="2">Savings</SelectItem>
+                            <SelectItem value="3">Credit Card</SelectItem>
+                            <SelectItem value="4">Investment</SelectItem>
+                            <SelectItem value="5">Loan</SelectItem>
+                            <SelectItem value="6">Cash</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -203,10 +221,12 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
               )}
             />
             <DialogFooter>
+              <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit">{initialAccount ? 'Update' : 'Create'}</Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>

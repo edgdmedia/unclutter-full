@@ -56,6 +56,9 @@ interface TransactionFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialTransaction?: any | null;
+  initialAccount?: string;
+  isLoading?: boolean;
+  onSubmit?: (values: any) => void;
 }
 
 const formSchema = z.object({
@@ -64,16 +67,37 @@ const formSchema = z.object({
   date: z.date(),
   amount: z.coerce.number().positive({ message: 'Amount must be positive' }),
   account: z.string().min(1, { message: 'Account is required' }),
-  category: z.string().min(1, { message: 'Category is required' }),
+  category: z.string().optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
   toAccount: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Category is required for income and expense transactions
+  if (data.type !== 'transfer' && (!data.category || data.category.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Category is required',
+      path: ['category'],
+    });
+  }
+  
+  // Destination account is required for transfer transactions
+  if (data.type === 'transfer' && (!data.toAccount || data.toAccount.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Destination account is required for transfers',
+      path: ['toAccount'],
+    });
+  }
 });
 
 const TransactionFormDialog: React.FC<TransactionFormDialogProps> = ({
   open,
   onOpenChange,
   initialTransaction,
+  initialAccount,
+  isLoading = false,
+  onSubmit: customSubmit,
 }) => {
   const { accounts, categories, addTransaction, updateTransaction, deleteTransaction } = useFinance();
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
@@ -116,51 +140,73 @@ const TransactionFormDialog: React.FC<TransactionFormDialogProps> = ({
         type: 'expense',
         date: new Date(),
         amount: 0,
-        account: accounts.length > 0 ? accounts[0].id : '',
+        account: initialAccount || (accounts.length > 0 ? accounts[0].id : ''),
         category: '',
         description: '',
         notes: '',
         toAccount: '',
       });
     }
-  }, [initialTransaction, form, accounts]);
+  }, [initialTransaction, initialAccount, form, accounts]);
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    const finalAmount = values.type === 'expense' ? -Math.abs(values.amount) : values.amount;
-    
-    if (initialTransaction?.id) {
-      // Update existing transaction
-      updateTransaction({
-        id: initialTransaction.id,
-        date: values.date.toISOString(),
-        amount: finalAmount,
-        description: values.description || 'Unnamed transaction',
-        category: values.category,
-        accountId: values.account,
-        type: values.type
-      });
-      toast.success('Transaction updated successfully!');
-    } else {
-      // Create new transaction
-      addTransaction({
-        date: values.date.toISOString(),
-        amount: finalAmount,
-        description: values.description || 'Unnamed transaction',
-        category: values.category,
-        accountId: values.account,
-        type: values.type
-      });
-      toast.success('Transaction added successfully!');
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      // If a custom submit handler is provided, use it
+      if (customSubmit) {
+        return customSubmit(values);
+      }
+      
+      // Otherwise use the default implementation
+      // Always use positive amount and let the type determine if it's positive or negative
+      const amount = Math.abs(values.amount);
+      
+      // Format transaction data for the API
+      const transactionData = {
+        transaction_date: values.date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        amount: amount,
+        description: values.description || '',
+        notes: values.notes || '',
+        category_id: values.category,
+        account_id: values.account,
+        type: values.type,
+        tags: [], // Add tags if needed
+        // Include destination_account_id for transfer transactions
+        ...(values.type === 'transfer' && values.toAccount ? { destination_account_id: values.toAccount } : {})
+      };
+      
+      // The destination_account_id is already added in the transactionData object above
+      
+      if (initialTransaction?.id) {
+        // Update existing transaction
+        await updateTransaction({
+          id: initialTransaction.id,
+          ...transactionData
+        } as any);
+        toast.success('Transaction updated successfully!');
+      } else {
+        // Create new transaction
+        await addTransaction(transactionData as any);
+        toast.success('Transaction added successfully!');
+      }
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Transaction operation failed:', error);
+      toast.error('Failed to save transaction. Please try again.');
     }
-    onOpenChange(false);
   };
   
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (initialTransaction?.id) {
-      deleteTransaction(initialTransaction.id);
-      toast.success('Transaction deleted successfully!');
-      setShowDeleteDialog(false);
-      onOpenChange(false);
+      try {
+        await deleteTransaction(initialTransaction.id);
+        toast.success('Transaction deleted successfully!');
+        setShowDeleteDialog(false);
+        onOpenChange(false);
+      } catch (error) {
+        console.error('Failed to delete transaction:', error);
+        toast.error('Failed to delete transaction. Please try again.');
+        setShowDeleteDialog(false);
+      }
     }
   };
 
@@ -221,7 +267,7 @@ const TransactionFormDialog: React.FC<TransactionFormDialogProps> = ({
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid align-center grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="date"
@@ -402,7 +448,7 @@ const TransactionFormDialog: React.FC<TransactionFormDialogProps> = ({
                 )}
               />
 
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter className="gap-2 flex justify-end flex-row sm:gap-0">
                 {initialTransaction && (
                   <Button 
                     type="button" 
@@ -413,10 +459,19 @@ const TransactionFormDialog: React.FC<TransactionFormDialogProps> = ({
                     <Trash2 size={16} className="mr-1" /> Delete
                   </Button>
                 )}
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
                   Cancel
                 </Button>
-                <Button type="submit">{initialTransaction ? 'Update' : 'Create'}</Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <span className="animate-spin mr-1">⏳</span>
+                      {initialTransaction ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    initialTransaction ? 'Update' : 'Create'
+                  )}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

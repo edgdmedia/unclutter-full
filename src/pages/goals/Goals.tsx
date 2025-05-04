@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Clock, Calendar, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useFinance } from '@/context/FinanceContext';
+import { formatCurrency } from '@/utils/formatters';
 import GoalFormDialog from '@/components/goals/GoalFormDialog';
 
 const Goals: React.FC = () => {
@@ -25,13 +25,6 @@ const Goals: React.FC = () => {
   const handleEditGoal = (goal: any) => {
     setSelectedGoal(goal);
     setIsGoalFormOpen(true);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
   };
 
   const renderGoalCard = (goal: any) => {

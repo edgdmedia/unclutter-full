@@ -1,13 +1,15 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash } from 'lucide-react';
+import { Plus, Edit, Trash, Eye, FolderPlus } from 'lucide-react';
 import { useFinance } from '@/context/FinanceContext';
 import CategoryDialog from '@/components/categories/CategoryDialog';
 import DeleteCategoryDialog from '@/components/categories/DeleteCategoryDialog';
+import CategoryDetailsDialog from '@/components/categories/CategoryDetailsDialog';
 import { toast } from '@/components/ui/sonner';
+import * as categoriesApi from '@/services/categoriesApi';
+import CategoryList from '@/components/categories/CategoryList';
 
 type CategoryType = 'income' | 'expense' | 'account' | 'tag';
 
@@ -16,39 +18,162 @@ interface Category {
   name: string;
   type: CategoryType;
   description?: string;
-  parent?: string;
+  parent_id?: string | null;
   usageCount: number;
+  profile_id?: string;
+  is_active?: string;
+  created_at?: string;
+  updated_at?: string;
+  children?: Category[];
 }
 
 const Categories: React.FC = () => {
-  const { categories } = useFinance();
+  const { categories, fetchCategories, setCategories } = useFinance();
   const [activeTab, setActiveTab] = useState<CategoryType>('expense');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [parentCategory, setParentCategory] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Force a refresh of categories when component mounts
+  useEffect(() => {
+    console.log('Categories component mounted, refreshing categories');
+    fetchCategories();
+  }, []);
 
   const handleEditCategory = (category: Category) => {
+    if (categoriesApi.isGlobalCategory(category)) {
+      toast.error("Global categories cannot be edited");
+      return;
+    }
     setEditingCategory(category);
     setIsAddDialogOpen(true);
   };
 
   const handleDeleteCategory = (category: Category) => {
+    if (categoriesApi.isGlobalCategory(category)) {
+      toast.error("Global categories cannot be deleted");
+      return;
+    }
     setCategoryToDelete(category);
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSaveCategory = (category: Category) => {
-    toast.success("Category saved successfully!");
-    setIsAddDialogOpen(false);
-    setEditingCategory(null);
+  const handleCategoryClick = async (category: Category) => {
+    // Open dialog immediately with existing info
+    setSelectedCategory(category);
+    setIsDetailsDialogOpen(true);
+
+    // Fetch latest details in the background
+    try {
+      const response = await categoriesApi.getCategoryDetails(category.id);
+      if (response.success) {
+        // Save or update in local DB (use your own dbService or similar)
+        // Example: await dbService.saveCategory(response.data);
+        // For now, just update selectedCategory with new details
+        setSelectedCategory({ ...category, ...response.data });
+      }
+    } catch (error) {
+      // Optionally handle error
+      // toast.error('Failed to update category details');
+    }
   };
 
-  const handleConfirmDelete = () => {
+  const handleAddSubcategory = (parentId: string) => {
+    setParentCategory(parentId);
+    setIsAddDialogOpen(true);
+  };
+
+  const handleViewCategory = (category: Category) => {
+    setSelectedCategory(category);
+    setIsDetailsDialogOpen(true);
+  };
+
+  const handleSaveCategory = async (category: Category) => {
+    setIsLoading(true);
+    const originalCategories = [...categories]; // Store original state for potential rollback
+    let savedCategory: Category | null = null;
+
+    try {
+      const categoryData = {
+        ...category,
+        parent_id: parentCategory
+      };
+
+      if (editingCategory && editingCategory.id) {
+        // --- Optimistic Update (Edit) ---
+        setCategories(prev => 
+          prev.map(cat => 
+            cat.id === editingCategory.id ? { ...cat, ...categoryData } : cat
+          )
+        );
+        // -------------------------------
+        savedCategory = await categoriesApi.updateCategory(editingCategory.id, categoryData);
+        toast.success("Category updated successfully!");
+      } else {
+        // --- Optimistic Add (Placeholder ID) ---
+        const tempId = `temp-${Date.now()}`;
+        const optimisticCategory = { ...categoryData, id: tempId }; 
+        setCategories(prev => [...prev, optimisticCategory]);
+        // ------------------------------------
+        savedCategory = await categoriesApi.createCategory(categoryData);
+        toast.success("Category created successfully!");
+        // --- Update UI with Real ID ---
+        setCategories(prev => 
+          prev.map(cat => 
+            cat.id === tempId ? { ...savedCategory, id: savedCategory.id } : cat
+          )
+        );
+        // ---------------------------
+      }
+    } catch (error) {
+      console.error('Error saving category:', error);
+      toast.error("Failed to save category");
+      // --- Rollback on error ---
+      setCategories(originalCategories);
+      // -----------------------
+    } finally {
+      setIsLoading(false);
+      setIsAddDialogOpen(false);
+      setEditingCategory(null);
+      setParentCategory(null);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
     if (categoryToDelete) {
-      toast.success(`Category "${categoryToDelete.name}" deleted successfully!`);
-      setIsDeleteDialogOpen(false);
-      setCategoryToDelete(null);
+      setIsLoading(true);
+      const originalCategories = [...categories]; // Store original state for potential rollback
+      const categoryIdToDelete = categoryToDelete.id;
+
+      // --- Optimistic Delete ---
+      setCategories(prev => prev.filter(cat => cat.id !== categoryIdToDelete));
+      // -----------------------
+      
+      try {
+        if (categoriesApi.isGlobalCategory(categoryToDelete)) {
+          toast.error("Cannot delete global categories");
+          setCategories(originalCategories); // Rollback
+          return;
+        }
+
+        await categoriesApi.deleteCategory(categoryIdToDelete);
+        toast.success(`Category "${categoryToDelete.name}" deleted successfully!`);
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        toast.error("Failed to delete category");
+        // --- Rollback on error ---
+        setCategories(originalCategories);
+        // -----------------------
+      } finally {
+        setIsLoading(false);
+        setIsDeleteDialogOpen(false);
+        setCategoryToDelete(null);
+      }
     }
   };
 
@@ -76,33 +201,13 @@ const Categories: React.FC = () => {
             <Card>
               <CardContent className="p-4">
                 {filteredCategories.length > 0 ? (
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-12 font-medium py-2 px-3 text-sm border-b">
-                      <div className="col-span-5">Name</div>
-                      <div className="col-span-5">Description</div>
-                      <div className="col-span-1">Usage</div>
-                      <div className="col-span-1 text-right">Actions</div>
-                    </div>
-                    {filteredCategories.map(category => (
-                      <div key={category.id} className="grid grid-cols-12 items-center py-2 px-3 text-sm hover:bg-muted/50 rounded-md">
-                        <div className="col-span-5 font-medium">{category.name}</div>
-                        <div className="col-span-5 text-muted-foreground truncate">{category.description || '-'}</div>
-                        <div className="col-span-1">{category.usageCount}</div>
-                        <div className="col-span-1 flex justify-end space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditCategory(category)}>
-                            <Edit size={16} />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDeleteCategory(category)}
-                          >
-                            <Trash size={16} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <CategoryList
+                    categories={filteredCategories}
+                    onCategoryClick={handleCategoryClick}
+                    onEditCategory={handleEditCategory}
+                    onDeleteCategory={handleDeleteCategory}
+                    isLoading={isLoading}
+                  />
                 ) : (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-4">No {tabValue} categories found</p>
@@ -119,10 +224,17 @@ const Categories: React.FC = () => {
 
       <CategoryDialog 
         open={isAddDialogOpen} 
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCategory(null);
+            setParentCategory(null);
+          }
+          setIsAddDialogOpen(open);
+        }}
         initialCategory={editingCategory}
         categoryType={activeTab}
         onSave={handleSaveCategory}
+        parentId={parentCategory}
       />
 
       <DeleteCategoryDialog
@@ -130,6 +242,13 @@ const Categories: React.FC = () => {
         onOpenChange={setIsDeleteDialogOpen}
         category={categoryToDelete}
         onConfirm={handleConfirmDelete}
+      />
+      
+      <CategoryDetailsDialog
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        category={selectedCategory}
+        onAddSubcategory={handleAddSubcategory}
       />
     </div>
   );

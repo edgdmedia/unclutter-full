@@ -1,7 +1,7 @@
-
 import React from 'react';
-import { useFinance } from '@/context/FinanceContext';
-import { Bell, User, Menu } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { Bell, User, Menu, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -13,8 +13,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const Header: React.FC = () => {
-  const { user, logout } = useFinance();
+interface HeaderProps {
+  canInstall: boolean;
+  onInstallClick: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ canInstall, onInstallClick }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center px-4 md:px-6 justify-between">
@@ -29,6 +40,19 @@ const Header: React.FC = () => {
           <Bell className="h-5 w-5" />
           <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
         </Button>
+        
+        {canInstall && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onInstallClick} 
+            title="Install App"
+            className="flex items-center gap-2 bg-finance-yellow text-finance-blue hover:bg-finance-yellow/90"
+          >
+            <Download className="h-4 w-4" />
+            <span>Install App</span>
+          </Button>
+        )}
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -47,7 +71,7 @@ const Header: React.FC = () => {
             <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout}>
+            <DropdownMenuItem onClick={handleLogout}>
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>

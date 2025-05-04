@@ -15,7 +15,7 @@ import { toast } from '@/components/ui/sonner';
 interface Account {
   id: string;
   name: string;
-  balance: number;
+  balance: number | string;
 }
 
 interface DeleteAccountDialogProps {
@@ -44,7 +44,7 @@ const DeleteAccountDialog: React.FC<DeleteAccountDialogProps> = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Account</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete "{account.name}" with a balance of ${account.balance.toFixed(2)}? This action cannot be undone.
+            Are you sure you want to delete "{account.name}" with a balance of ${typeof account.balance === 'string' ? parseFloat(account.balance).toFixed(2) : account.balance.toFixed(2)}? This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import * as authApi from '@/services/authApi';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -46,18 +47,31 @@ const RegisterPage: React.FC = () => {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    
-    // In a real app, this would call an API endpoint
-    setTimeout(() => {
+    try {
+      const payload = {
+        first_name: values.firstName,
+        last_name: values.lastName,
+        email: values.email,
+        password: values.password,
+      };
+      await authApi.register(payload);
       toast({
         title: "Registration successful",
-        description: "Please check your email to verify your account.",
+        description: "Please verify your email with the code sent to your inbox.",
       });
+      // Redirect to verify email page with the email as state
+      navigate("/verify-email", { state: { email: values.email } });
+    } catch (error) {
+      toast({
+        title: "Registration failed",
+        description: error instanceof Error ? error.message : "Could not register. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-      navigate("/login");
-    }, 1500);
+    }
   }
 
   return (
