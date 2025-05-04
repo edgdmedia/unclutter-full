@@ -20,6 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: ./frontend/financePWA
 
       - name: Update version information
         run: |
@@ -39,9 +40,11 @@ jobs:
           }
           EOL
           echo "Updated version.json with version $CURRENT_VERSION and build date $BUILD_DATE"
+        working-directory: ./frontend/financePWA
 
       - name: Build
         run: npm run build
+        working-directory: ./frontend/financePWA
         env:
           VITE_APP_ENV: production
           VITE_APP_API_URL: https://finance.unclutter.com.ng/
@@ -54,7 +57,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: "dist/*"
+          source: "frontend/financePWA/dist/*"
           target: "/home/unclutter/domains/finance.unclutter.com.ng/public_html/"
           strip_components: 1
 
