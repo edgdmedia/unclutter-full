@@ -13,7 +13,7 @@ class Unclutter_Finance_Utils
      */
     public static function auth_required($request)
     {
-        return Unclutter_Auth_Controller::auth_required($request);
+        return Unclutter_Auth_Service::auth_required($request);
     }
 
     /**

@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as accountsApi from '../services/accountsApi';
 import * as dashboardApi from '../services/dashboardApi';
 import * as authApi from '../services/authApi';
@@ -78,6 +78,7 @@ interface FinanceContextType {
   fetchDashboardSummary: () => Promise<void>;
   fetchDashboardTrends: () => Promise<void>;
   fetchTransactions: (limit?: number) => Promise<void>;
+  fetchTransactionsByAccount: (accountId: string) => Promise<void>;
   addAccount: (data: Partial<Account>) => Promise<void>;
   updateAccount: (id: string, data: Partial<Account>) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
@@ -99,6 +100,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
   const [dashboardTrends, setDashboardTrends] = useState<DashboardTrends | null>(null);
+  const [db, setDb] = useState<any>(null);
+  
+  // Initialize database when component mounts
+  useEffect(() => {
+    const initializeDb = async () => {
+      try {
+        const database = await dbService.initDB();
+        setDb(database);
+        console.log('Database initialized successfully');
+      } catch (error) {
+        console.error('Error initializing database:', error);
+      }
+    };
+    
+    initializeDb();
+  }, []);
+  
   // Fetch accounts from API with IndexedDB caching
   const fetchAccounts = async () => {
     console.log('fetchAccounts called, isAuthenticated:', isAuthenticated);
@@ -245,14 +263,74 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Format: { success: true, data: [...] }
         console.log('Setting transactions from res.data array:', res.data);
         setTransactions(res.data);
+        
+        // Update IndexedDB
+        if (db) {
+          try {
+            const tx = db.transaction('transactions', 'readwrite');
+            const store = tx.objectStore('transactions');
+            
+            // Clear existing transactions
+            await store.clear();
+            
+            // Add new transactions
+            for (const transaction of res.data) {
+              await store.add(transaction);
+            }
+            
+            console.log('Transactions saved to IndexedDB');
+          } catch (dbError) {
+            console.error('Error saving transactions to IndexedDB:', dbError);
+          }
+        }
       } else if (res && res.data && Array.isArray(res.data)) {
         // Format: { data: [...] }
         console.log('Setting transactions from res.data array:', res.data);
         setTransactions(res.data);
+        
+        // Update IndexedDB
+        if (db) {
+          try {
+            const tx = db.transaction('transactions', 'readwrite');
+            const store = tx.objectStore('transactions');
+            
+            // Clear existing transactions
+            await store.clear();
+            
+            // Add new transactions
+            for (const transaction of res.data) {
+              await store.add(transaction);
+            }
+            
+            console.log('Transactions saved to IndexedDB');
+          } catch (dbError) {
+            console.error('Error saving transactions to IndexedDB:', dbError);
+          }
+        }
       } else if (res && Array.isArray(res)) {
         // Format: [...]
         console.log('Setting transactions from direct array:', res);
         setTransactions(res);
+        
+        // Update IndexedDB
+        if (db) {
+          try {
+            const tx = db.transaction('transactions', 'readwrite');
+            const store = tx.objectStore('transactions');
+            
+            // Clear existing transactions
+            await store.clear();
+            
+            // Add new transactions
+            for (const transaction of res) {
+              await store.add(transaction);
+            }
+            
+            console.log('Transactions saved to IndexedDB');
+          } catch (dbError) {
+            console.error('Error saving transactions to IndexedDB:', dbError);
+          }
+        }
       } else {
         // Unknown format
         console.warn('Unexpected transactions data format:', res);
@@ -261,6 +339,164 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error fetching transactions:', e);
       setTransactions([]);
+      
+      // Try to load from IndexedDB if online fetch fails
+      if (db) {
+        try {
+          const tx = db.transaction('transactions', 'readonly');
+          const store = tx.objectStore('transactions');
+          const transactions = await store.getAll();
+          
+          if (transactions && transactions.length > 0) {
+            console.log('Loaded transactions from IndexedDB:', transactions);
+            setTransactions(transactions);
+          }
+        } catch (dbError) {
+          console.error('Error loading transactions from IndexedDB:', dbError);
+        }
+      }
+    }
+  };
+  
+  // Track the last fetched account to prevent duplicate calls
+  const lastFetchedAccountRef = useRef<string | null>(null);
+  const fetchingRef = useRef<boolean>(false);
+
+  // Fetch transactions for a specific account
+  const fetchTransactionsByAccount = async (accountId: string) => {
+    // Prevent duplicate or rapid consecutive calls for the same account
+    if (fetchingRef.current || lastFetchedAccountRef.current === accountId) {
+      console.log('Skipping duplicate fetch for account:', accountId);
+      return;
+    }
+    
+    fetchingRef.current = true;
+    lastFetchedAccountRef.current = accountId;
+    try {
+      console.log('Fetching transactions for account:', accountId);
+      const res = await transactionsApi.getTransactionsByAccount(accountId);
+      console.log('Account transactions API response:', res);
+      
+      // Handle different response formats
+      if (res && res.success && Array.isArray(res.data)) {
+        // Format: { success: true, data: [...] }
+        console.log('Setting account transactions from res.data array:', res.data);
+        setTransactions(res.data);
+        
+        // Update IndexedDB - store with account ID as key
+        if (db) {
+          try {
+            // Check if the accountTransactions store exists
+            if (db.objectStoreNames.contains('accountTransactions')) {
+              const tx = db.transaction('accountTransactions', 'readwrite');
+              const store = tx.objectStore('accountTransactions');
+              
+              // Store the account transactions with the account ID as key
+              await store.put({ accountId, transactions: res.data });
+              
+              console.log('Account transactions saved to IndexedDB');
+            } else {
+              console.log('accountTransactions store does not exist, skipping IndexedDB save');
+              // Just store in regular transactions store instead
+              const tx = db.transaction('transactions', 'readwrite');
+              const store = tx.objectStore('transactions');
+
+              // Add transactions to the regular transactions store
+              for (const transaction of res.data) {
+                if (transaction.account_id === accountId) {
+                  await store.put(transaction);
+                }
+              }
+            }
+          } catch (dbError) {
+            console.error('Error saving account transactions to IndexedDB:', dbError);
+          }
+        }
+      } else if (res && Array.isArray(res)) {
+        // Direct array format
+        console.log('Setting account transactions from direct array:', res);
+        setTransactions(res);
+
+        // Update IndexedDB
+        if (db) {
+          try {
+            // Check if the accountTransactions store exists
+            if (db.objectStoreNames.contains('accountTransactions')) {
+              const tx = db.transaction('accountTransactions', 'readwrite');
+              const store = tx.objectStore('accountTransactions');
+
+              // Store the account transactions with the account ID as key
+              await store.put({ accountId, transactions: res });
+
+              console.log('Account transactions saved to IndexedDB');
+            } else {
+              console.log('accountTransactions store does not exist, skipping IndexedDB save');
+              // Just store in regular transactions store instead
+              const tx = db.transaction('transactions', 'readwrite');
+              const store = tx.objectStore('transactions');
+
+              // Add transactions to the regular transactions store
+              for (const transaction of res) {
+                if (transaction.account_id === accountId) {
+                  await store.put(transaction);
+                }
+              }
+            }
+          } catch (dbError) {
+            console.error('Error saving account transactions to IndexedDB:', dbError);
+          }
+        }
+      } else {
+        // Unknown format or empty response
+        console.warn('Unexpected account transactions data format:', res);
+        setTransactions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching account transactions:', error);
+      setTransactions([]);
+
+      // Try to load from IndexedDB if online fetch fails
+      if (db) {
+        try {
+          // Check if the accountTransactions store exists
+          if (db.objectStoreNames.contains('accountTransactions')) {
+            const tx = db.transaction('accountTransactions', 'readonly');
+            const store = tx.objectStore('accountTransactions');
+            const accountData = await store.get(accountId);
+
+            if (accountData && accountData.transactions && accountData.transactions.length > 0) {
+              console.log('Loaded account transactions from IndexedDB:', accountData.transactions);
+              setTransactions(accountData.transactions);
+            }
+          } else {
+            console.log('accountTransactions store does not exist, trying to filter from transactions store');
+            // Try to filter from the transactions store instead
+            const tx = db.transaction('transactions', 'readonly');
+            const store = tx.objectStore('transactions');
+            const allTransactions = await store.getAll();
+
+            // Filter transactions by account ID
+            const filteredTransactions = allTransactions.filter(
+              (transaction) => transaction.account_id === accountId
+            );
+
+            if (filteredTransactions.length > 0) {
+              console.log('Loaded filtered transactions from IndexedDB:', filteredTransactions);
+              setTransactions(filteredTransactions);
+            }
+          }
+        } catch (dbError) {
+          console.error('Error loading account transactions from IndexedDB:', dbError);
+        }
+      }
+
+      // Re-throw to allow component to handle the error
+      throw error;
+    } finally {
+      // Reset fetching state after a short delay to prevent immediate re-fetching
+      setTimeout(() => {
+        fetchingRef.current = false;
+      }, 1000);
     }
   };
 
@@ -329,19 +565,45 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Add account
   const addAccount = async (data: Partial<Account>) => {
     try {
-      await accountsApi.createAccount(data);
-      await fetchAccounts();
+      const response = await accountsApi.createAccount(data);
+      
+      // If the API returns the new account, add it to the accounts state immediately
+      if (response && response.success && response.account) {
+        // Update the accounts state with the new account
+        setAccounts(prevAccounts => [...prevAccounts, response.account]);
+        return response.account;
+      } else {
+        // Fallback to fetching all accounts if the API doesn't return the new account
+        await fetchAccounts();
+      }
+      return response;
     } catch (e) {
-      // Optionally handle error
+      console.error('Error adding account:', e);
+      throw e; // Re-throw to allow handling in the component
     }
   };
   // Update account
   const updateAccount = async (id: string, data: Partial<Account>) => {
     try {
-      await accountsApi.updateAccount(id, data);
-      await fetchAccounts();
+      const response = await accountsApi.updateAccount(id, data);
+      
+      // If the API returns the updated account, update it in the accounts state immediately
+      if (response && response.success && response.account) {
+        // Update the accounts state with the updated account
+        setAccounts(prevAccounts => 
+          prevAccounts.map(account => 
+            account.id === id ? response.account : account
+          )
+        );
+        return response.account;
+      } else {
+        // Fallback to fetching all accounts if the API doesn't return the updated account
+        await fetchAccounts();
+      }
+      return response;
     } catch (e) {
-      // Optionally handle error
+      console.error('Error updating account:', e);
+      throw e; // Re-throw to allow handling in the component
     }
   };
   // Delete account
@@ -508,6 +770,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fetchDashboardSummary,
         fetchDashboardTrends,
         fetchTransactions,
+        fetchTransactionsByAccount,
         addAccount,
         updateAccount,
         deleteAccount,

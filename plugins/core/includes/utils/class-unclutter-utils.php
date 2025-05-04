@@ -15,5 +15,6 @@ class Unclutter_Utils {
         // TODO: Implement email validation
         return filter_var($email, FILTER_VALIDATE_EMAIL);
     }
+
     // Add more helpers as needed
 }

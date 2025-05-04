@@ -67,11 +67,39 @@ class Unclutter_Auth_Controller {
             'methods' => 'POST',
             'callback' => [self::class, 'forgot_password'],
             'permission_callback' => '__return_true',
+            'args' => [
+                'email' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_string($param) && filter_var($param, FILTER_VALIDATE_EMAIL);
+                    },
+                ],
+            ],
         ]);
         register_rest_route('api/v1/auth', '/reset-password', [
             'methods' => 'POST',
             'callback' => [self::class, 'reset_password'],
             'permission_callback' => '__return_true',
+            'args' => [
+                'email' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_string($param) && filter_var($param, FILTER_VALIDATE_EMAIL);
+                    },
+                ],
+                'code' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_string($param) && strlen($param) >= 8;
+                    },
+                ],
+                'new_password' => [
+                    'required' => true,
+                    'validate_callback' => function($param, $request, $key) {
+                        return is_string($param) && strlen($param) >= 8;
+                    },
+                ],
+            ],
         ]);
         register_rest_route('api/v1/auth', '/verify-token', [
             'methods' => 'POST',
@@ -91,7 +119,7 @@ class Unclutter_Auth_Controller {
         register_rest_route('api/v1/auth', '/change-password', [
             'methods' => 'POST',
             'callback' => [self::class, 'change_password'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'current_password' => [
                     'required' => true,
@@ -112,13 +140,6 @@ class Unclutter_Auth_Controller {
         $params = $request->get_json_params();
         $result = Unclutter_Auth_Service::login($params['email'] ?? '', $params['password'] ?? '');
         return new WP_REST_Response($result, $result['success'] ? 200 : 401);
-    }
-    public static function auth_required($request) {
-        $auth = $request->get_header('authorization');
-        if (!$auth || stripos($auth, 'Bearer ') !== 0) return false;
-        $jwt = trim(substr($auth, 7));
-        $result = Unclutter_Auth_Service::verify_token($jwt);
-        return $result && !empty($result['success']);
     }
     public static function register($request) {
         $params = $request->get_json_params();
@@ -142,13 +163,64 @@ class Unclutter_Auth_Controller {
     }
     public static function reset_password($request) {
         $params = $request->get_json_params();
-        $result = Unclutter_Auth_Service::reset_password($params['profile_id'] ?? 0, $params['token'] ?? '', $params['new_password'] ?? '');
+        $email = $params['email'] ?? '';
+        $code = $params['code'] ?? '';
+        $new_password = $params['new_password'] ?? '';
+        
+        // Look up profile_id from email
+        $profile = Unclutter_Profile_Model::get_profile_by_email($email);
+        if (!$profile) {
+            return new WP_REST_Response([
+                'success' => false, 
+                'message' => 'Invalid email or token'
+            ], 400);
+        }
+        
+        $profile_id = $profile->id;
+        
+        // Add debugging
+        $reset_token = Unclutter_Profile_Model::get_meta($profile_id, 'reset_token');
+        $reset_expires = Unclutter_Profile_Model::get_meta($profile_id, 'reset_expires');
+        
+        if (!$reset_token) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'No reset token found for this user',
+                'debug' => ['profile_id' => $profile_id]
+            ], 400);
+        }
+        
+        if ($reset_token !== $code) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'Token mismatch',
+                'debug' => [
+                    'expected' => $reset_token,
+                    'received' => $code,
+                    'length_expected' => strlen($reset_token),
+                    'length_received' => strlen($code)
+                ]
+            ], 400);
+        }
+        
+        if (strtotime($reset_expires) < time()) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => 'Token expired',
+                'debug' => [
+                    'expires' => $reset_expires,
+                    'current' => date('Y-m-d H:i:s')
+                ]
+            ], 400);
+        }
+        
+        $result = Unclutter_Auth_Service::reset_password($profile_id, $code, $new_password);
         return new WP_REST_Response($result, $result['success'] ? 200 : 400);
     }
 
     public static function change_password($request) {
         $params = $request->get_json_params();
-        $profile_id = self::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Utils::get_profile_id_from_token($request);
         $result = Unclutter_Auth_Service::change_password($profile_id, $params['current_password'] ?? '', $params['new_password'] ?? '');
         return new WP_REST_Response($result, $result['success'] ? 200 : 400);
     }
@@ -171,13 +243,5 @@ class Unclutter_Auth_Controller {
         return new WP_REST_Response($result, $result['success'] ? 200 : 401);
     }
 
-    public static function get_profile_id_from_token($request)
-    {
-        $auth = $request->get_header('authorization');
-        if (!$auth || stripos($auth, 'Bearer ') !== 0) return null;
-        $jwt = trim(substr($auth, 7));
-        $result = Unclutter_Auth_Service::verify_token($jwt);
-        return $result && !empty($result['success']) ? $result['profile_id'] : null;
-    }
 }
 

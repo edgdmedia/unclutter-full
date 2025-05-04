@@ -39,7 +39,7 @@ interface AccountFormDialogProps {
   initialAccount?: {
     id: string;
     name: string;
-    type: string;
+    type_id: number;
     institution: string;
     balance: number;
     notes?: string;
@@ -50,7 +50,7 @@ interface AccountFormDialogProps {
 const formSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(2, { message: 'Account name is required' }),
-  type: z.string().min(1, { message: 'Account type is required' }),
+  type_id: z.string().min(1, { message: 'Account type is required' }),
   institution: z.string().min(1, { message: 'Institution is required' }),
   balance: z.coerce.number(),
   notes: z.string().optional(),
@@ -77,7 +77,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      type: '',
+      type_id: '',
       institution: '',
       balance: 0,
       notes: '',
@@ -89,7 +89,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
       form.reset({
         id: initialAccount.id,
         name: initialAccount.name,
-        type: initialAccount.type,
+        type_id: initialAccount.type_id || initialAccount.type, // Handle both type_id and legacy type
         institution: initialAccount.institution,
         balance: initialAccount.balance,
         notes: initialAccount.notes || '',
@@ -97,7 +97,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
     } else {
       form.reset({
         name: '',
-        type: '',
+        type_id: '',
         institution: '',
         balance: 0,
         notes: '',
@@ -139,7 +139,7 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="type"
+                name="type_id"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Account Type</FormLabel>
@@ -155,18 +155,18 @@ const AccountFormDialog: React.FC<AccountFormDialogProps> = ({
                       <SelectContent>
                         {accountTypes.length > 0 ? (
                           accountTypes.map(type => (
-                            <SelectItem key={type.id} value={type.name.toLowerCase()}>
+                            <SelectItem key={type.id} value={type.id}>
                               {type.name}
                             </SelectItem>
                           ))
                         ) : (
                           <>
-                            <SelectItem value="checking">Checking</SelectItem>
-                            <SelectItem value="savings">Savings</SelectItem>
-                            <SelectItem value="credit_card">Credit Card</SelectItem>
-                            <SelectItem value="investment">Investment</SelectItem>
-                            <SelectItem value="loan">Loan</SelectItem>
-                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="1">Checking</SelectItem>
+                            <SelectItem value="2">Savings</SelectItem>
+                            <SelectItem value="3">Credit Card</SelectItem>
+                            <SelectItem value="4">Investment</SelectItem>
+                            <SelectItem value="5">Loan</SelectItem>
+                            <SelectItem value="6">Cash</SelectItem>
                           </>
                         )}
                       </SelectContent>

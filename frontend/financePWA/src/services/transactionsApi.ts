@@ -126,6 +126,126 @@ export const getTransaction = async (id: string) => {
   }
 };
 
+// Get transactions for a specific account with offline support
+export const getTransactionsByAccount = async (accountId: string) => {
+  try {
+    // First try to get from IndexedDB
+    const db = await dbService.initDB();
+    let accountTransactions = null;
+    
+    // Check if the accountTransactions store exists
+    if (db.objectStoreNames.contains('accountTransactions')) {
+      try {
+        accountTransactions = await db.get('accountTransactions', accountId);
+      } catch (error) {
+        console.log('Error accessing accountTransactions store:', error);
+      }
+    }
+    
+    // If we're offline, just return cached data
+    if (!navigator.onLine) {
+      console.log(`Offline: Using cached transactions for account ${accountId}`);
+      if (accountTransactions && accountTransactions.transactions) {
+        return { success: true, data: accountTransactions.transactions };
+      } else {
+        // Try to filter all transactions by account_id
+        try {
+          const allTransactions = await db.getAll('transactions');
+          const filteredTransactions = allTransactions.filter(
+            (transaction) => transaction.account_id === accountId
+          );
+          
+          if (filteredTransactions.length > 0) {
+            return { success: true, data: filteredTransactions };
+          } else {
+            return { success: true, data: [] };
+          }
+        } catch (error) {
+          console.log('Error accessing transactions store:', error);
+          return { success: true, data: [] };
+        }
+      }
+    }
+    
+    // If we're online, try to fetch from API
+    try {
+      console.log(`Fetching transactions for account ${accountId} from API`);
+      const res = await api.get('/transactions', {
+        params: {
+          account_id: accountId,
+          per_page: 100, // Get a reasonable number of transactions
+          page: 1,
+          order: 'desc',
+          order_by: 'transaction_date'
+        }
+      });
+      console.log('API Response for account transactions:', res.data);
+      
+      // Save to IndexedDB for offline use
+      if (res.data && (res.data.data || Array.isArray(res.data))) {
+        const transactions = res.data.data || res.data;
+        
+        // Check if accountTransactions store exists before using it
+        if (db.objectStoreNames.contains('accountTransactions')) {
+          try {
+            // Store in accountTransactions store for quick access
+            await db.put('accountTransactions', {
+              accountId,
+              transactions,
+              lastUpdated: new Date().toISOString()
+            });
+            console.log('Account transactions saved to accountTransactions store');
+          } catch (error) {
+            console.error('Error saving to accountTransactions store:', error);
+          }
+        }
+        
+        // Always update individual transactions in the transactions store
+        try {
+          const tx = db.transaction('transactions', 'readwrite');
+          const store = tx.objectStore('transactions');
+          
+          for (const transaction of transactions) {
+            transaction._synced = true;
+            await store.put(transaction);
+          }
+          console.log('Account transactions saved to transactions store');
+        } catch (error) {
+          console.error('Error saving to transactions store:', error);
+        }
+      }
+      
+      return res.data;
+    } catch (error) {
+      console.error(`API error, falling back to cached transactions for account ${accountId}:`, error);
+      
+      // Try to get from accountTransactions store first
+      if (accountTransactions && accountTransactions.transactions) {
+        return { success: true, data: accountTransactions.transactions };
+      }
+      
+      // If not found in accountTransactions, filter all transactions
+      try {
+        const tx = db.transaction('transactions', 'readonly');
+        const store = tx.objectStore('transactions');
+        const allTransactions = await store.getAll();
+        
+        const filteredTransactions = allTransactions.filter(
+          (transaction) => transaction.account_id === accountId
+        );
+        
+        return { success: true, data: filteredTransactions };
+      } catch (dbError) {
+        console.error('Error filtering transactions from store:', dbError);
+        return { success: true, data: [] };
+      }
+    }
+  } catch (error) {
+    console.error(`Error getting transactions for account ${accountId}:`, error);
+    throw error;
+  }
+};
+
 // Create a new transaction
 export interface CreateTransactionData {
   amount: number;

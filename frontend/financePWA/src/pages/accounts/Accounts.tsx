@@ -7,6 +7,7 @@ import { useFinance } from '@/context/FinanceContext';
 import AccountFormDialog from '@/components/accounts/AccountFormDialog';
 import DeleteAccountDialog from '@/components/accounts/DeleteAccountDialog';
 import { toast } from '@/components/ui/sonner';
+import { useNavigate } from 'react-router-dom';
 
 const Accounts: React.FC = () => {
   const {
@@ -16,6 +17,7 @@ const Accounts: React.FC = () => {
     deleteAccount,
     fetchAccounts
   } = useFinance();
+  const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
@@ -28,7 +30,11 @@ const Accounts: React.FC = () => {
   }, []);
 
   // Calculate total balance across all accounts
-  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+  const totalBalance = accounts.reduce((sum, account) => {
+    // Convert string balance to number if needed
+    const accountBalance = typeof account.balance === 'string' ? parseFloat(account.balance) : account.balance;
+    return sum + accountBalance;
+  }, 0);
 
   // Group accounts by type
   const accountsByType = accounts.reduce((grouped, account) => {
@@ -59,14 +65,27 @@ const Accounts: React.FC = () => {
     setIsLoading(true);
     try {
       if (selectedAccount && selectedAccount.id) {
-        await updateAccount(selectedAccount.id, values);
+        // Update existing account
+        const updatedAccount = await updateAccount(selectedAccount.id, values);
         toast.success('Account updated successfully!');
+        
+        // If we have the updated account data, no need to refresh all accounts
+        if (!updatedAccount) {
+          await fetchAccounts();
+        }
       } else {
-        await addAccount(values);
-        toast.success('Account added successfully!');
+        // Create new account
+        const newAccount = await addAccount(values);
+        
+        if (newAccount) {
+          toast.success(`Account '${newAccount.name}' added successfully!`);
+        } else {
+          toast.success('Account added successfully!');
+          // Refresh accounts list if we didn't get the new account data
+          await fetchAccounts();
+        }
       }
-      // Refresh accounts list
-      await fetchAccounts();
+      
       setIsFormOpen(false);
       setSelectedAccount(null);
     } catch (err) {
@@ -116,7 +135,7 @@ const Accounts: React.FC = () => {
           <div className="text-center py-4">
             <p className="text-sm text-muted-foreground">Total Balance</p>
             <h2 className="text-3xl font-bold text-finance-blue">
-              ${totalBalance}
+              ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h2>
           </div>
         </CardContent>
@@ -127,7 +146,7 @@ const Accounts: React.FC = () => {
           <h2 className="text-lg font-semibold capitalize">{type}</h2>
           <div className="space-y-2">
             {accounts.map((account) => (
-              <Card key={account.id} className="hover:shadow-md transition-shadow">
+              <Card key={account.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/accounts/${account.id}`)}>
                 <CardContent className="p-0">
                   <div className="w-full text-left px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -142,15 +161,18 @@ const Accounts: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`font-semibold ${account.balance >= 0 ? 'text-finance-green' : 'text-finance-red'}`}>
-                        ${Math.abs(account.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className={`font-semibold ${parseFloat(account.balance) >= 0 ? 'text-finance-green' : 'text-finance-red'}`}>
+                        ${Math.abs(parseFloat(account.balance)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       <div className="flex">
                         <Button 
                           variant="ghost" 
                           size="sm" 
                           className="h-8 w-8 p-0" 
-                          onClick={() => handleEditAccount(account)}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent navigation when clicking the edit button
+                            handleEditAccount(account);
+                          }}
                         >
                           <span className="sr-only">Edit</span>
                           <ChevronRight size={16} className="text-muted-foreground" />

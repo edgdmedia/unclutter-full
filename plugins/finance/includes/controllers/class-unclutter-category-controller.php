@@ -15,7 +15,7 @@ class Unclutter_Category_Controller {
         register_rest_route('api/v1/finance', '/categories/(?P<id>\d+)/details', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_category_details'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'month' => [
                     'required' => false,
@@ -36,7 +36,7 @@ class Unclutter_Category_Controller {
         register_rest_route('api/v1/finance', '/categories', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_categories'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'type' => [
                     'required' => false,
@@ -63,14 +63,14 @@ class Unclutter_Category_Controller {
         register_rest_route('api/v1/finance', '/categories/(?P<id>\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_category'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
         
         // Create a new category
         register_rest_route('api/v1/finance', '/categories', [
             'methods' => 'POST',
             'callback' => [self::class, 'create_category'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'name' => [
                     'required' => true,
@@ -103,7 +103,7 @@ class Unclutter_Category_Controller {
         register_rest_route('api/v1/finance', '/categories/(?P<id>\d+)', [
             'methods' => 'PUT',
             'callback' => [self::class, 'update_category'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'name' => [
                     'required' => false,
@@ -136,14 +136,14 @@ class Unclutter_Category_Controller {
         register_rest_route('api/v1/finance', '/categories/(?P<id>\d+)', [
             'methods' => 'DELETE',
             'callback' => [self::class, 'delete_category'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
         
         // Search categories
         register_rest_route('api/v1/finance', '/categories/search', [
             'methods' => 'GET',
             'callback' => [self::class, 'search_categories'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'search' => [
                     'required' => true,
@@ -169,7 +169,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function get_categories($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -248,7 +248,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function get_category_details($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -273,7 +273,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function get_category($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -294,7 +294,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function create_category($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -351,7 +351,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function update_category($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -452,7 +452,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function search_categories($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }

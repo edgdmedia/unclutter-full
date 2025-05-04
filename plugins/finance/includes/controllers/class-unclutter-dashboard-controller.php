@@ -12,19 +12,19 @@ class Unclutter_Dashboard_Controller {
         register_rest_route('api/v1/finance', '/dashboard/summary', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_summary'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
         // Dashboard trends
         register_rest_route('api/v1/finance', '/dashboard/trends', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_trends'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
     }
 
 
     public static function get_summary($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -34,7 +34,7 @@ class Unclutter_Dashboard_Controller {
         return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
     public static function get_trends($request) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }

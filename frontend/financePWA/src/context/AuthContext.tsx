@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import * as authApi from '@/services/authApi';
+import * as userApi from '@/services/userApi';
 import { toast } from '@/components/ui/sonner';
 
 // Define user profile interface
@@ -19,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  updateUserProfile: (userData: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -114,8 +116,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsAuthenticated(true);
   };
 
+  const updateUserProfile = (userData: Partial<UserProfile>) => {
+    if (!user) return;
+    
+    // Update the user object with new data
+    const updatedUser = {
+      ...user,
+      ...userData
+    };
+    
+    // Update state
+    setUser(updatedUser);
+    
+    // Update localStorage
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, refreshToken }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, refreshToken, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

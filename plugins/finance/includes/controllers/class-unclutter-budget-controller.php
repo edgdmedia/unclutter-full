@@ -17,7 +17,7 @@ class Unclutter_Budget_Controller
         register_rest_route('api/v1/finance', '/budgets', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_budgets'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'month' => [
                     'required' => false,
@@ -39,7 +39,7 @@ class Unclutter_Budget_Controller
         register_rest_route('api/v1/finance', '/budgets', [
             'methods' => 'POST',
             'callback' => [self::class, 'create_budget'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'category_id' => [
                     'required' => true,
@@ -76,13 +76,13 @@ class Unclutter_Budget_Controller
         register_rest_route('api/v1/finance', '/budgets/(?P<id>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_budget'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required']
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required']
         ]);
         //Get Budget by category and period
         register_rest_route('api/v1/finance', '/budgets/category/(?P<category_id>\\d+)/(?P<month>\\d+)/(?P<year>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_budget_by_category_and_period'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'category_id' => [
                     'required' => true,
@@ -114,7 +114,7 @@ class Unclutter_Budget_Controller
      */
     public static function get_budget_by_category_and_period($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $category_id = $request['category_id'];
         $month = $request['month'];
         $year = $request['year'];
@@ -159,7 +159,7 @@ class Unclutter_Budget_Controller
      */
     public static function get_budgets($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $data['profile_id'] = $profile_id;
         $result = Unclutter_Budget_Service::get_budgets($data);
         return new WP_REST_Response([
@@ -175,7 +175,7 @@ class Unclutter_Budget_Controller
      */
     public static function get_budget($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $data['id'] = $request['id'];
         $data['profile_id'] = $profile_id;
         $result = Unclutter_Budget_Service::get_budget($data);
@@ -195,7 +195,7 @@ class Unclutter_Budget_Controller
      */
     public static function create_budget($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $data = $request->get_json_params();
         $data['profile_id'] = $profile_id;
         $result = Unclutter_Budget_Service::create_budget($data);
@@ -231,8 +231,12 @@ class Unclutter_Budget_Controller
      */
     public static function delete_budget($request)
     {
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
+        if (!$profile_id) {
+            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
         $id = (int) $request['id'];
-        $result = Unclutter_Budget_Service::delete_budget($id);
+        $result = Unclutter_Budget_Service::delete_budget($profile_id, $id);
         if (is_wp_error($result)) {
             return $result;
         }

@@ -56,9 +56,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, limit }
             </div>
             <div className={cn(
               "font-medium",
-              transaction.type === 'income' ? "text-finance-green" : "text-finance-red"
+              transaction.type === 'income' ? "text-finance-green" : 
+              transaction.type === 'transfer' ? "text-blue-500" : "text-finance-red"
             )}>
-              {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+              {transaction.type === 'income' ? '+' : 
+               transaction.type === 'transfer' ? '↔' : '-'}{formatCurrency(transaction.amount)}
             </div>
           </div>
         ))

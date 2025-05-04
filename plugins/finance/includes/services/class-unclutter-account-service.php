@@ -24,8 +24,8 @@ class Unclutter_Account_Service {
      * @param int $id Account ID
      * @return object|null Account object or null if not found
      */
-    public static function get_account($id) {
-        return Unclutter_Account_Model::get_account($id);
+    public static function get_account($profile_id, $id) {
+        return Unclutter_Account_Model::get_account($profile_id, $id);
     }
     
     /**
@@ -50,12 +50,8 @@ class Unclutter_Account_Service {
      * @param array $data Account data
      * @return bool True on success, false on failure
      */
-    public static function update_account($id, $data) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($id);
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        return Unclutter_Account_Model::update_account($id, $data);
+    public static function update_account($profile_id, $id, $data) {
+        return Unclutter_Account_Model::update_account($profile_id, $id, $data);
     }
     
     /**
@@ -64,12 +60,8 @@ class Unclutter_Account_Service {
      * @param int $id Account ID
      * @return bool True on success, false on failure
      */
-    public static function delete_account($id) {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($id);
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        return Unclutter_Account_Model::delete_account($id);
+    public static function delete_account($profile_id, $id) {
+        return Unclutter_Account_Model::delete_account($profile_id, $id);
     }
     
     /**

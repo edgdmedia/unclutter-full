@@ -42,15 +42,39 @@ class Unclutter_Transaction_Model extends Unclutter_Base_Model {
      * @param array $attachments Optional array of attachment URLs
      * @return int|false The transaction ID on success, false on failure
      */
-    public static function insert_transaction($data) {
+    public static function insert_transaction($profile_id, $data) {
         global $wpdb;
         $table = self::get_table_name();
         
         // Ensure required fields
-        if (empty($data['profile_id']) || empty($data['account_id']) || 
-            empty($data['category_id']) || !isset($data['amount']) || 
+        if (empty($data['account_id']) || !isset($data['amount']) || 
             empty($data['transaction_date']) || empty($data['type'])) {
             return false;
+        }
+        
+        // For non-transfer transactions, category is required
+        if ($data['type'] !== 'transfer' && empty($data['category_id'])) {
+            return false;
+        }
+        
+        // For transfer transactions, set a default category if not provided
+        if ($data['type'] === 'transfer' && empty($data['category_id'])) {
+            // Get a default category for transfers (using the first expense category as fallback)
+            global $wpdb;
+            $categories_table = $wpdb->prefix . 'unclutter_finance_categories';
+            $default_category = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM $categories_table WHERE type = 'expense' AND (name LIKE '%transfer%' OR name LIKE '%Transfer%') LIMIT 1"
+            ));
+            
+            // If no transfer category found, use the first expense category
+            if (!$default_category) {
+                $default_category = $wpdb->get_var($wpdb->prepare(
+                    "SELECT id FROM $categories_table WHERE type = 'expense' LIMIT 1"
+                ));
+            }
+            
+            // Set the default category
+            $data['category_id'] = $default_category ? $default_category : 1;
         }
         
         // Start transaction
@@ -70,17 +94,41 @@ class Unclutter_Transaction_Model extends Unclutter_Base_Model {
             
             $transaction_id = $wpdb->insert_id;
             
-            // Update account balance
+            // Update account balance(s)
             $amount = (float) $data['amount'];
             $type = $data['type'];
             
-            // For expenses, amount should be negative when updating account balance
-            if ($type === 'expense') {
-                $amount = -$amount;
+            if ($type === 'transfer') {
+                // For transfers, deduct from source account and add to destination account
+                if (empty($data['destination_account_id'])) {
+                    throw new Exception('Destination account is required for transfers');
+                }
+                
+                // Deduct from source account
+                $source_updated = Unclutter_Account_Model::update_balance($profile_id, $data['account_id'], -$amount);
+                
+                if (!$source_updated) {
+                    throw new Exception('Failed to update source account balance');
+                }
+                
+                // Add to destination account
+                $destination_updated = Unclutter_Account_Model::update_balance($profile_id, $data['destination_account_id'], $amount);
+                
+                if (!$destination_updated) {
+                    throw new Exception('Failed to update destination account balance');
+                }
+                
+                // Set account_updated flag for the next check
+                $account_updated = true;
+            } else {
+                // For expenses, amount should be negative when updating account balance
+                if ($type === 'expense') {
+                    $amount = -$amount;
+                }
+                
+                // Update account balance for income/expense
+                $account_updated = Unclutter_Account_Model::update_balance($profile_id, $data['account_id'], $amount);
             }
-            
-            // Update account balance
-            $account_updated = Unclutter_Account_Model::update_balance($data['account_id'], $amount);
             
             if (!$account_updated) {
                 throw new Exception('Failed to update account balance');
@@ -124,41 +172,127 @@ class Unclutter_Transaction_Model extends Unclutter_Base_Model {
             // Set updated_at
             $data['updated_at'] = current_time('mysql');
             
-            // If amount or type changed, adjust account balance
-            if ((isset($data['amount']) && $data['amount'] != $current_transaction->amount) ||
-                (isset($data['type']) && $data['type'] != $current_transaction->type) ||
-                (isset($data['account_id']) && $data['account_id'] != $current_transaction->account_id)) {
+            // For transfer transactions, set a default category if not provided
+            if (isset($data['type']) && $data['type'] === 'transfer' && empty($data['category_id'])) {
+                // Get a default category for transfers (using the first expense category as fallback)
+                $categories_table = $wpdb->prefix . 'unclutter_finance_categories';
+                $default_category = $wpdb->get_var($wpdb->prepare(
+                    "SELECT id FROM $categories_table WHERE type = 'expense' AND (name LIKE '%transfer%' OR name LIKE '%Transfer%') LIMIT 1"
+                ));
                 
-                // Reverse the previous transaction effect on the account
-                $reverse_amount = (float) $current_transaction->amount;
-                if ($current_transaction->type === 'expense') {
-                    $reverse_amount = -$reverse_amount;
+                // If no transfer category found, use the first expense category
+                if (!$default_category) {
+                    $default_category = $wpdb->get_var($wpdb->prepare(
+                        "SELECT id FROM $categories_table WHERE type = 'expense' LIMIT 1"
+                    ));
                 }
                 
-                // Reverse the effect on the original account
-                $account_reversed = Unclutter_Account_Model::update_balance(
-                    $current_transaction->account_id, 
-                    -$reverse_amount
-                );
-                
-                if (!$account_reversed) {
-                    throw new Exception('Failed to adjust original account balance');
+                // Set the default category
+                $data['category_id'] = $default_category ? $default_category : 1;
+            }
+            
+            // If amount, type, account_id, or destination_account_id changed, adjust account balance(s)
+            if ((isset($data['amount']) && $data['amount'] != $current_transaction->amount) ||
+                (isset($data['type']) && $data['type'] != $current_transaction->type) ||
+                (isset($data['account_id']) && $data['account_id'] != $current_transaction->account_id) ||
+                (isset($data['destination_account_id']) && 
+                 (($current_transaction->type === 'transfer' && $data['destination_account_id'] != $current_transaction->destination_account_id) ||
+                  ($current_transaction->type !== 'transfer' && isset($data['type']) && $data['type'] === 'transfer')))) {
+            
+                // Reverse the previous transaction effect based on its type
+                if ($current_transaction->type === 'transfer') {
+                    // For transfers, we need to reverse both accounts
+                    // Reverse source account (add the amount back)
+                    $source_reversed = Unclutter_Account_Model::update_balance(
+                        $profile_id,
+                        $current_transaction->account_id,
+                        (float) $current_transaction->amount
+                    );
+                    
+                    if (!$source_reversed) {
+                        throw new Exception('Failed to reverse source account balance');
+                    }
+                    
+                    // Reverse destination account (subtract the amount)
+                    $dest_reversed = Unclutter_Account_Model::update_balance(
+                        $profile_id,
+                        $current_transaction->destination_account_id,
+                        -(float) $current_transaction->amount
+                    );
+                    
+                    if (!$dest_reversed) {
+                        throw new Exception('Failed to reverse destination account balance');
+                    }
+                } else {
+                    // Reverse the previous income/expense transaction
+                    $reverse_amount = (float) $current_transaction->amount;
+                    if ($current_transaction->type === 'expense') {
+                        $reverse_amount = -$reverse_amount;
+                    }
+                    
+                    // Reverse the effect on the original account
+                    $account_reversed = Unclutter_Account_Model::update_balance(
+                        $profile_id,
+                        $current_transaction->account_id, 
+                        $reverse_amount
+                    );
+                    
+                    if (!$account_reversed) {
+                        throw new Exception('Failed to adjust original account balance');
+                    }
                 }
                 
                 // Apply the new transaction effect
                 $new_amount = isset($data['amount']) ? (float) $data['amount'] : (float) $current_transaction->amount;
                 $new_type = isset($data['type']) ? $data['type'] : $current_transaction->type;
                 $new_account_id = isset($data['account_id']) ? $data['account_id'] : $current_transaction->account_id;
+                $new_destination_id = isset($data['destination_account_id']) ? 
+                                      $data['destination_account_id'] : 
+                                      ($current_transaction->type === 'transfer' ? $current_transaction->destination_account_id : null);
                 
-                if ($new_type === 'expense') {
-                    $new_amount = -$new_amount;
-                }
-                
-                // Update the new account balance
-                $account_updated = Unclutter_Account_Model::update_balance($new_account_id, $new_amount);
-                
-                if (!$account_updated) {
-                    throw new Exception('Failed to update new account balance');
+                // Apply the new effect based on the new transaction type
+                if ($new_type === 'transfer') {
+                    // Validate destination account for transfers
+                    if (empty($new_destination_id)) {
+                        throw new Exception('Destination account is required for transfers');
+                    }
+                    
+                    // Deduct from source account
+                    $source_updated = Unclutter_Account_Model::update_balance(
+                        $profile_id, 
+                        $new_account_id, 
+                        -$new_amount
+                    );
+                    
+                    if (!$source_updated) {
+                        throw new Exception('Failed to update source account balance');
+                    }
+                    
+                    // Add to destination account
+                    $destination_updated = Unclutter_Account_Model::update_balance(
+                        $profile_id, 
+                        $new_destination_id, 
+                        $new_amount
+                    );
+                    
+                    if (!$destination_updated) {
+                        throw new Exception('Failed to update destination account balance');
+                    }
+                    
+                    // Set account_updated flag for the next check
+                    $account_updated = true;
+                } else {
+                    // For expenses, amount should be negative when updating account balance
+                    if ($new_type === 'expense') {
+                        $new_amount = -$new_amount;
+                    }
+                    
+                    // Update the new account balance for income/expense
+                    $account_updated = Unclutter_Account_Model::update_balance($profile_id, $new_account_id, $new_amount);
+                    
+                    if (!$account_updated) {
+                        throw new Exception('Failed to update new account balance');
+                    }
                 }
             }
             

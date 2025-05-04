@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import * as authApi from '@/services/authApi';
+import { toast } from "@/components/ui/sonner";
+import { useAuth } from '@/context/AuthContext';
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -25,9 +25,18 @@ const formSchema = z.object({
 });
 
 const LoginPage: React.FC = () => {
-  const { toast } = useToast();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, location]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,18 +50,12 @@ const LoginPage: React.FC = () => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      const data = await authApi.login(values.email, values.password);
-      toast({
-        title: "Login successful",
-        description: data.message || "Welcome back to Unclutter Finance!",
-      });
-      navigate("/dashboard");
+      // Use the login method from AuthContext
+      await login(values.email, values.password);
+      // Note: No need to show toast here as it's handled in the AuthContext
+      // Redirect is handled by the useEffect that watches isAuthenticated
     } catch (error) {
-      toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Invalid email or password. Please try again.",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +88,7 @@ const LoginPage: React.FC = () => {
               <FormItem>
                 <FormLabel>Password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Enter your password" {...field} />
+                  <Input type="password" placeholder="Enter your password" autoComplete="current-password" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

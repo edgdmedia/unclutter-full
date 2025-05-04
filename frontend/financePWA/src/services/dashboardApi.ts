@@ -33,43 +33,25 @@ export interface DashboardTrends {
 export const getDashboardSummary = async () => {
   try {
     console.log('Fetching dashboard summary...');
-    // Use the endpoint as specified in the API docs (finance/dashboard/summary)
+    // Use the correct endpoint path as registered in the backend
     const res = await api.get('/dashboard/summary');
     console.log('Dashboard summary response:', res.data);
     return res.data;
   } catch (error) {
     console.error('Error fetching dashboard summary:', error);
-    // Try alternative endpoint format if the first one fails
-    try {
-      console.log('Trying alternative endpoint...');
-      const res = await api.get('/finance/dashboard/summary');
-      console.log('Alternative dashboard summary response:', res.data);
-      return res.data;
-    } catch (altError) {
-      console.error('Alternative endpoint also failed:', altError);
-      throw error; // Throw the original error
-    }
+    throw error;
   }
 };
 
 export const getDashboardTrends = async () => {
   try {
     console.log('Fetching dashboard trends...');
-    // Use the endpoint as specified in the API docs
+    // Use the correct endpoint path as registered in the backend
     const res = await api.get('/dashboard/trends');
     console.log('Dashboard trends response:', res.data);
     return res.data;
   } catch (error) {
     console.error('Error fetching dashboard trends:', error);
-    // Try alternative endpoint format if the first one fails
-    try {
-      console.log('Trying alternative endpoint...');
-      const res = await api.get('/finance/dashboard/trends');
-      console.log('Alternative dashboard trends response:', res.data);
-      return res.data;
-    } catch (altError) {
-      console.error('Alternative endpoint also failed:', altError);
-      throw error; // Throw the original error
-    }
+    throw error;
   }
 };

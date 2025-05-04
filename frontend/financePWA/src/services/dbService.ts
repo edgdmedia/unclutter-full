@@ -37,6 +37,14 @@ interface FinanceDB extends DBSchema {
     };
     indexes: { 'by-name': string };
   };
+  accountTransactions: {
+    key: string; // accountId
+    value: {
+      accountId: string;
+      transactions: any[];
+      lastUpdated: string;
+    };
+  };
   userSettings: {
     key: string; // 'profile', 'preferences', 'notifications'
     value: any; // Store different types of user settings
@@ -152,7 +160,7 @@ export const initDB = async (): Promise<IDBPDatabase<FinanceDB>> => {
   dbInitializing = true;
   
   try {
-    console.log('Initializing IndexedDB database');
+    // console.log('Initializing IndexedDB database');
     const db = await openDB<FinanceDB>('finance-db', 2, {
       upgrade(db, oldVersion, newVersion) {
         console.log(`Upgrading database from version ${oldVersion} to ${newVersion}`);
@@ -164,30 +172,42 @@ export const initDB = async (): Promise<IDBPDatabase<FinanceDB>> => {
           // Create accounts store
           const accountsStore = db.createObjectStore('accounts', { keyPath: 'id' });
           accountsStore.createIndex('by-name', 'name');
-
+          
           // Create categories store
           const categoriesStore = db.createObjectStore('categories', { keyPath: 'id' });
           categoriesStore.createIndex('by-type', 'type');
           categoriesStore.createIndex('by-profile', 'profile_id');
-
+          
           // Create transactions store
           const transactionsStore = db.createObjectStore('transactions', { keyPath: 'id' });
           transactionsStore.createIndex('by-date', 'transaction_date');
           transactionsStore.createIndex('by-account', 'account_id');
           transactionsStore.createIndex('by-sync', '_synced');
-
+          
           // Create lastSync store for tracking last synchronization
           db.createObjectStore('lastSync', { keyPath: 'entity' });
-
+          
           // Create offlineQueue store for pending operations
           const offlineQueueStore = db.createObjectStore('offlineQueue', { 
             keyPath: 'id',
             autoIncrement: true
           });
           offlineQueueStore.createIndex('by-entity', 'entity');
-
+          
           // Create appState store for app-wide state
           db.createObjectStore('appState', { keyPath: 'key' });
+          
+          console.log('Created all stores for version 1');
+        }
+        
+        // Version 2: Add accountTransactions store
+        if (oldVersion < 2) {
+          console.log('Upgrading to schema version 2');
+          
+          if (!db.objectStoreNames.contains('accountTransactions')) {
+            db.createObjectStore('accountTransactions', { keyPath: 'accountId' });
+            console.log('Created accountTransactions store');
+          }
         }
         
         // Upgrade to version 2 - add new indexes and fields for conflict resolution

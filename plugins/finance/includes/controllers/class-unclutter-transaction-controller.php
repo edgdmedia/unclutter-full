@@ -16,7 +16,7 @@ class Unclutter_Transaction_Controller
         register_rest_route('api/v1/finance', '/transactions', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_transactions'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'account_id' => [
                     'description' => 'Filter by account ID',
@@ -59,7 +59,7 @@ class Unclutter_Transaction_Controller
         register_rest_route('api/v1/finance', '/transactions', [
             'methods' => 'POST',
             'callback' => [self::class, 'create_transaction'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'amount' => [
                     'description' => 'Transaction amount',
@@ -67,8 +67,9 @@ class Unclutter_Transaction_Controller
                     'required' => true,
                 ],
                 'type' => [
-                    'description' => 'Transaction type (income or expense)',
+                    'description' => 'Transaction type (income, expense, or transfer)',
                     'type' => 'string',
+                    'enum' => ['income', 'expense', 'transfer'],
                     'required' => true,
                 ],
                 'transaction_date' => [
@@ -77,14 +78,19 @@ class Unclutter_Transaction_Controller
                     'required' => true,
                 ],
                 'category_id' => [
-                    'description' => 'Category ID',
+                    'description' => 'Category ID (not required for transfer transactions)',
+                    'type' => ['integer', 'null', 'string'],
+                    'required' => false,
+                ],
+                'account_id' => [
+                    'description' => 'Account ID (source account for transfers)',
                     'type' => 'integer',
                     'required' => true,
                 ],
-                'account_id' => [
-                    'description' => 'Account ID',
+                'destination_account_id' => [
+                    'description' => 'Destination account ID (required for transfer transactions)',
                     'type' => 'integer',
-                    'required' => true,
+                    'required' => false,
                 ],
                 'description' => [
                     'description' => 'Transaction description',
@@ -107,13 +113,13 @@ class Unclutter_Transaction_Controller
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_transaction'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
         // Update transaction
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'PUT',
             'callback' => [self::class, 'update_transaction'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'id' => [
                     'description' => 'Transaction ID',
@@ -126,7 +132,7 @@ class Unclutter_Transaction_Controller
         register_rest_route('api/v1/finance', '/transactions/(?P<id>\\d+)', [
             'methods' => 'DELETE',
             'callback' => [self::class, 'delete_transaction'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'id' => [
                     'description' => 'Transaction ID',
@@ -139,7 +145,7 @@ class Unclutter_Transaction_Controller
 
     public static function get_transactions($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $params = $request->get_params();
 
         // Pagination
@@ -173,7 +179,7 @@ class Unclutter_Transaction_Controller
 
     public static function get_transaction($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $id = (int) $request['id'];
         $result = Unclutter_Transaction_Service::get_transaction($profile_id, $id);
         if (!$result) {
@@ -184,22 +190,42 @@ class Unclutter_Transaction_Controller
 
     public static function create_transaction($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $data = $request->get_json_params();
         $data['profile_id'] = $profile_id;
+        
+        // Handle category_id for transfer transactions
+        if (isset($data['type']) && $data['type'] === 'transfer') {
+            // If category_id is null, empty string, or not set, remove it from the data
+            // so the model layer can handle it appropriately
+            if (empty($data['category_id']) || $data['category_id'] === null || $data['category_id'] === '') {
+                unset($data['category_id']);
+            }
+        }
+        
         $result = Unclutter_Transaction_Service::create_transaction($profile_id, $data);
         if (is_wp_error($result)) {
             return $result;
         }
-        return new WP_REST_Response(['success' => true], 200);
+        return new WP_REST_Response(['success' => true, 'data' => $result], 200);
     }
 
     public static function update_transaction($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $id = (int) $request['id'];
         $data = $request->get_json_params();
         $data['profile_id'] = $profile_id;
+        
+        // Handle category_id for transfer transactions
+        if (isset($data['type']) && $data['type'] === 'transfer') {
+            // If category_id is null, empty string, or not set, remove it from the data
+            // so the model layer can handle it appropriately
+            if (empty($data['category_id']) || $data['category_id'] === null || $data['category_id'] === '') {
+                unset($data['category_id']);
+            }
+        }
+        
         $result = Unclutter_Transaction_Service::update_transaction($profile_id, $id, $data);
         if (is_wp_error($result)) {
             return $result;
@@ -209,7 +235,7 @@ class Unclutter_Transaction_Controller
 
     public static function delete_transaction($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $id = (int) $request['id'];
         $result = Unclutter_Transaction_Service::delete_transaction($profile_id, $id);
         if (is_wp_error($result)) {

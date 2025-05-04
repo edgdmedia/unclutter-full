@@ -67,6 +67,25 @@ class Unclutter_Transaction_Service {
         if (empty($data['amount']) || empty($data['type']) || empty($data['transaction_date'])) {
             return new WP_Error('missing_fields', 'Required fields: amount, type, transaction_date.');
         }
+        
+        // Validate category_id for non-transfer transactions
+        if ($data['type'] !== 'transfer' && empty($data['category_id'])) {
+            return new WP_Error('missing_fields', 'Category ID is required for income and expense transactions.');
+        }
+        
+        // For transfer transactions, we don't need to set a default category here
+        // as it will be handled in the model layer
+        
+        // Validate transfer transactions
+        if ($data['type'] === 'transfer' && empty($data['destination_account_id'])) {
+            return new WP_Error('missing_fields', 'Destination account is required for transfer transactions.');
+        }
+        
+        // Validate that source and destination accounts are different for transfers
+        if ($data['type'] === 'transfer' && $data['account_id'] == $data['destination_account_id']) {
+            return new WP_Error('invalid_accounts', 'Source and destination accounts must be different for transfers.');
+        }
+        
         $data['profile_id'] = $profile_id;
 
         // Extract tags and attachments, remove from $data
@@ -76,7 +95,7 @@ class Unclutter_Transaction_Service {
         unset($data['attachments']);
 
         // Insert transaction (only the main transaction fields)
-        $transaction_id = Unclutter_Transaction_Model::insert_transaction($data);
+        $transaction_id = Unclutter_Transaction_Model::insert_transaction($profile_id, $data);
         if (!$transaction_id) {
             return new WP_Error('db_error', 'Could not create transaction.');
         }

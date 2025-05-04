@@ -7,6 +7,24 @@
 if (!defined('ABSPATH')) exit;
 
 class Unclutter_Auth_Service {
+
+    public static function auth_required($request) {
+        $auth = $request->get_header('authorization');
+        if (!$auth || stripos($auth, 'Bearer ') !== 0) return false;
+        $jwt = trim(substr($auth, 7));
+        $result = self::verify_token($jwt);
+        return $result && !empty($result['success']);
+    }
+
+
+    public static function get_profile_id_from_token($request)
+    {
+        $auth = $request->get_header('authorization');
+        if (!$auth || stripos($auth, 'Bearer ') !== 0) return null;
+        $jwt = trim(substr($auth, 7));
+        $result = self::verify_token($jwt);
+        return $result && !empty($result['success']) ? $result['profile_id'] : null;
+    }
     /**
      * Authenticate user and issue JWT if successful
      */
@@ -37,6 +55,11 @@ class Unclutter_Auth_Service {
         $access_token = self::generate_jwt($profile_id, 900); // 15 min
         $refresh_token = self::generate_refresh_token();
         $refresh_expires = date('Y-m-d H:i:s', strtotime('+7 days'));
+        
+        // Clear any existing refresh tokens first
+        Unclutter_Profile_Model::unset_meta($profile_id, 'refresh_token');
+        Unclutter_Profile_Model::unset_meta($profile_id, 'refresh_expires');
+        
         // Store refresh token in usermeta
         Unclutter_Profile_Model::set_meta($profile_id, [
             'refresh_token' => $refresh_token,
@@ -205,6 +228,12 @@ class Unclutter_Auth_Service {
             return ['success' => true];
         }
         $profile_id = $profile->id;
+        
+        // Clear any existing reset tokens first
+        Unclutter_Profile_Model::unset_meta($profile_id, 'reset_token');
+        Unclutter_Profile_Model::unset_meta($profile_id, 'reset_expires');
+        
+        // Generate and set new reset token
         $reset_token = wp_generate_password(16, false);
         $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
         $meta_data = [
@@ -219,10 +248,10 @@ class Unclutter_Auth_Service {
     /**
      * Reset password with token
      */
-    public static function reset_password($profile_id, $token, $new_password) {
+    public static function reset_password($profile_id, $code, $new_password) {
         $reset_token = Unclutter_Profile_Model::get_meta($profile_id, 'reset_token');
         $reset_expires = Unclutter_Profile_Model::get_meta($profile_id, 'reset_expires');
-        if (!$reset_token || $reset_token !== $token) {
+        if (!$reset_token || $reset_token !== $code) {
             return ['success' => false, 'message' => 'Invalid token'];
         }
         if (strtotime($reset_expires) < time()) {
@@ -281,7 +310,7 @@ class Unclutter_Auth_Service {
      * Generate JWT for authentication
      */
     // Generate JWT access token
-    private static function generate_jwt($profile_id, $exp = 3600) {
+    private static function generate_jwt($profile_id, $exp = 12400) {
         $header = base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
         $payload = base64_encode(json_encode([
             'profile_id' => $profile_id,
@@ -320,9 +349,9 @@ class Unclutter_Auth_Service {
     /**
      * Send password reset email
      */
-    private static function send_password_reset_email($email, $token) {
+    private static function send_password_reset_email($email, $code) {
         $subject = 'Reset your password';
-        $body = "Your password reset code is: $token";
+        $body = "Your password reset code is: $code";
         wp_mail($email, $subject, $body);
     }
 }

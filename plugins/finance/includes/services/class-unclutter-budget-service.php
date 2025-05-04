@@ -85,12 +85,7 @@ class Unclutter_Budget_Service {
      * @param WP_REST_Request $request
      * @return WP_REST_Response
      */
-    public static function delete_budget($request) {
-        $id = (int) $request['id'];
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
-        if (!$profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        return Unclutter_Budget_Model::delete_budget($id);
+    public static function delete_budget($profile_id, $id) {
+        return Unclutter_Budget_Model::delete_budget($profile_id, $id);
     }
 }

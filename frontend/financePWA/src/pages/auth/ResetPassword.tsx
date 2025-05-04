@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/sonner';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import * as authApi from '@/services/authApi';
 
 const formSchema = z.object({
@@ -19,12 +20,17 @@ const formSchema = z.object({
 });
 
 const ResetPasswordPage: React.FC = () => {
-  const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Try to get email from URL search params
+  const searchParams = new URLSearchParams(location.search);
+  const emailFromUrl = searchParams.get('email') || '';
   const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
+      email: emailFromUrl,
       code: '',
       password: '',
       confirmPassword: '',
@@ -34,18 +40,17 @@ const ResetPasswordPage: React.FC = () => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
+      // The backend expects email, code, and new_password
+      // Our authApi.resetPassword function has been updated to use these parameter names
       await authApi.resetPassword(values.email, values.code, values.password);
-      toast({
-        title: 'Password reset successful',
-        description: 'You can now log in with your new password.',
-      });
+      toast.success('Password reset successful. You can now log in with your new password.');
       form.reset();
+      // Redirect to login page after successful password reset
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
     } catch (error) {
-      toast({
-        title: 'Reset failed',
-        description: error instanceof Error ? error.message : 'Could not reset password.',
-        variant: 'destructive',
-      });
+      toast.error(error instanceof Error ? error.message : 'Could not reset password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +94,7 @@ const ResetPasswordPage: React.FC = () => {
               <FormItem>
                 <FormLabel>New Password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Enter new password" {...field} />
+                  <Input type="password" placeholder="Enter new password" autoComplete="new-password" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -102,7 +107,7 @@ const ResetPasswordPage: React.FC = () => {
               <FormItem>
                 <FormLabel>Confirm Password</FormLabel>
                 <FormControl>
-                  <Input type="password" placeholder="Confirm new password" {...field} />
+                  <Input type="password" placeholder="Confirm new password" autoComplete="new-password" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -116,11 +121,11 @@ const ResetPasswordPage: React.FC = () => {
     <div className="mt-6 text-center text-sm space-y-2">
       <div>
         Back to{' '}
-        <a href="/login" className="text-finance-blue hover:underline font-medium">Login</a>
+        <Link to="/login" className="text-finance-blue hover:underline font-medium">Login</Link>
       </div>
       <div>
-        Don&apos;t have an account?{' '}
-        <a href="/register" className="text-finance-blue hover:underline font-medium">Register</a>
+        Don't have an account?{' '}
+        <Link to="/register" className="text-finance-blue hover:underline font-medium">Register</Link>
       </div>
     </div>
     </>

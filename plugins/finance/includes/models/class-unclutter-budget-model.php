@@ -69,7 +69,7 @@ class Unclutter_Budget_Model extends Unclutter_Base_Model
      * @param int $id Budget ID
      * @return bool True on success, false on failure
      */
-    public static function delete_budget($id)
+    public static function delete_budget($profile_id, $id)
     {
         global $wpdb;
         $table = self::get_table_name();
@@ -77,7 +77,7 @@ class Unclutter_Budget_Model extends Unclutter_Base_Model
         // Delete budget
         $result = $wpdb->delete(
             $table,
-            ['id' => $id]
+            ['id' => $id, 'profile_id' => $profile_id]
         );
 
         return $result !== false;

@@ -1,66 +1,96 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/components/ui/sonner";
+import * as authApi from '@/services/authApi';
 
-const API_BASE = 'https://dash.unclutter.com.ng/wp-json/api/v1/auth';
+const formSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" })
+});
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setError('');
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setMessage('Password reset email sent!');
-      } else {
-        setError(data.message || 'Failed to send reset email.');
-      }
-    } catch (err) {
-      setError('Network error.');
+      const data = await authApi.forgotPassword(values.email);
+      toast.success("Password reset instructions sent to your email");
+      // Redirect to reset password page with email parameter after a short delay
+      setTimeout(() => {
+        navigate(`/reset-password?email=${encodeURIComponent(values.email)}`);
+      }, 3000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send reset email. Please try again.");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
+  }
 
   return (
     <>
-    <form onSubmit={handleSubmit}>
-      <h2>Forgot Password</h2>
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        required
-      />
-      <button type="submit" disabled={loading}>{loading ? 'Sending...' : 'Send Reset Link'}</button>
-      {message && <div style={{ color: 'green' }}>{message}</div>}
-      {error && <div style={{ color: 'red' }}>{error}</div>}
-    </form>
-    <div className="mt-6 text-center text-sm space-y-2">
-      <div>
-        Remember your password?{' '}
-        <a href="/login" className="text-finance-blue hover:underline font-medium">Login</a>
+      <h2 className="text-2xl font-bold mb-6 text-center text-finance-blue">Forgot Password</h2>
+      
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter your email" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <Button 
+            type="submit" 
+            className="w-full bg-finance-yellow hover:bg-finance-yellow/90 text-finance-blue" 
+            disabled={isLoading}
+          >
+            {isLoading ? "Sending..." : "Send Reset Link"}
+          </Button>
+        </form>
+      </Form>
+      
+      <div className="mt-6 text-center text-sm space-y-2">
+        <div>
+          Remember your password?{' '}
+          <Link to="/login" className="text-finance-blue hover:underline font-medium">Login</Link>
+        </div>
+        <div>
+          Have a code?{' '}
+          <Link to="/reset-password" className="text-finance-blue hover:underline font-medium">Reset Password</Link>
+        </div>
+        <div>
+          Don't have an account?{' '}
+          <Link to="/register" className="text-finance-blue hover:underline font-medium">Register</Link>
+        </div>
       </div>
-      <div>
-        Have a code?{' '}
-        <a href="/reset-password" className="text-finance-blue hover:underline font-medium">Reset Password</a>
-      </div>
-      <div>
-        Don&apos;t have an account?{' '}
-        <a href="/register" className="text-finance-blue hover:underline font-medium">Register</a>
-      </div>
-    </div>
     </>
   );
 }

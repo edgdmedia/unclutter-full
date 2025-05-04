@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wallet, Plus, ChevronRight, DollarSign, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,17 +10,24 @@ import TransactionFormDialog from '@/components/transactions/TransactionFormDial
 import BudgetProgress from '@/components/dashboard/BudgetProgress';
 import GoalCard from '@/components/dashboard/GoalCard';
 import { useFinance } from '@/context/FinanceContext';
+import { useAuth } from '@/context/AuthContext';
 import { formatCurrency } from '@/utils/formatters';
+import { toast } from '@/components/ui/use-toast';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const { user } = useAuth();
+  
   const { 
     dashboardSummary,
     dashboardTrends,
     transactions,
     fetchDashboardSummary,
     fetchDashboardTrends,
-    fetchTransactions
+    fetchTransactions,
+    addTransaction
   } = useFinance();
   
   // Fetch dashboard data if not already loaded
@@ -70,15 +77,34 @@ const Dashboard: React.FC = () => {
     };
 
   return (
-    <div className="space-y-8 pb-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <Button size="sm" onClick={() => {
-                  handleAddTransaction(null);
-                }}>
-          <Plus className="mr-2 h-4 w-4" /> Add Transaction
-        </Button>
+    <div className="space-y-6 pb-8 relative">
+      <div className="flex items-center mt-4 justify-between">
+        <div>
+          <h1 className="text-2xl hidden font-bold tracking-tight">
+            {user?.first_name ? `Welcome back, ${user.first_name}!` : 'Welcome back!'}
+          </h1>
+          <p className="text-muted-foreground">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} <br/> Here's your financial overview
+          </p>
+        </div>
       </div>
+      
+      {/* Floating Action Button for Add Transaction */}
+      <Button 
+        className="fixed bottom-20 right-6 rounded-full w-14 h-14 shadow-lg z-50 flex items-center justify-center p-0"
+        size="icon"
+        onClick={() => setShowTransactionForm(true)}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+      
+      {/* Transaction Form Dialog */}
+      <TransactionFormDialog
+        open={showTransactionForm}
+        onOpenChange={setShowTransactionForm}
+        onSubmit={handleAddTransaction}
+        isLoading={isLoading}
+      />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

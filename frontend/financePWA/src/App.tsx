@@ -21,12 +21,17 @@ const Onboarding = lazy(() => import('@/pages/Onboarding'));
 // Auth Pages
 const Login = lazy(() => import("@/pages/auth/Login"));
 const Register = lazy(() => import("@/pages/auth/Register"));
+const ForgotPassword = lazy(() => import("@/pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
+const VerifyEmail = lazy(() => import("@/pages/auth/VerifyEmail"));
+const ResendVerification = lazy(() => import("@/pages/auth/ResendVerification"));
 
 // App Pages
 const Dashboard = lazy(() => import("@/pages/dashboard/Dashboard"));
 const More = lazy(() => import("@/pages/dashboard/More"));
 const PageNotFound = lazy(() => import("@/pages/common/PageNotFound"));
 const Accounts = lazy(() => import("@/pages/accounts/Accounts"));
+const AccountDetail = lazy(() => import("@/pages/accounts/AccountDetail"));
 const Transactions = lazy(() => import("@/pages/transactions/Transactions"));
 const Budgets = lazy(() => import("@/pages/budgets/Budgets"));
 const Goals = lazy(() => import("@/pages/goals/Goals"));
@@ -74,6 +79,26 @@ const App = () => {
                       <Register />
                     </Suspense>
                   } />
+                  <Route path="/forgot-password" element={
+                    <Suspense fallback={<LoadingFallback />}>
+                      <ForgotPassword />
+                    </Suspense>
+                  } />
+                  <Route path="/reset-password" element={
+                    <Suspense fallback={<LoadingFallback />}>
+                      <ResetPassword />
+                    </Suspense>
+                  } />
+                  <Route path="/verify-email" element={
+                    <Suspense fallback={<LoadingFallback />}>
+                      <VerifyEmail />
+                    </Suspense>
+                  } />
+                  <Route path="/resend-verification" element={
+                    <Suspense fallback={<LoadingFallback />}>
+                      <ResendVerification />
+                    </Suspense>
+                  } />
                 </Route>
 
                 {/* App Routes */}
@@ -86,6 +111,11 @@ const App = () => {
                   <Route path="/accounts" element={
                     <Suspense fallback={<LoadingFallback />}>
                       <Accounts />
+                    </Suspense>
+                  } />
+                  <Route path="/accounts/:id" element={
+                    <Suspense fallback={<LoadingFallback />}>
+                      <AccountDetail />
                     </Suspense>
                   } />
                   <Route path="/transactions" element={

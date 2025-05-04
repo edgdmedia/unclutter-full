@@ -1,4 +1,5 @@
 import { api } from './apiClient';
+import { AxiosError } from 'axios';
 
 // User profile interface
 export interface UserProfile {
@@ -44,6 +45,15 @@ export const updateUserProfile = async (profile: UserProfile) => {
     return res.data;
   } catch (error) {
     console.error('Error updating user profile:', error);
+    // Enhance error handling
+    if ((error as AxiosError)?.response?.status === 401) {
+      throw new Error('Authentication required. Please log in again.');
+    } else if ((error as AxiosError)?.response?.status === 400) {
+      const message = (error as AxiosError)?.response?.data?.message || 'Invalid profile data';
+      throw new Error(message);
+    } else if ((error as AxiosError)?.response?.status === 409) {
+      throw new Error('Email already in use by another account');
+    }
     throw error;
   }
 };
@@ -55,6 +65,13 @@ export const changePassword = async (data: { currentPassword: string; newPasswor
     return res.data;
   } catch (error) {
     console.error('Error changing password:', error);
+    // Enhance error handling
+    if ((error as AxiosError)?.response?.status === 401) {
+      throw new Error('Current password is incorrect');
+    } else if ((error as AxiosError)?.response?.status === 400) {
+      const message = (error as AxiosError)?.response?.data?.message || 'Invalid password format';
+      throw new Error(message);
+    }
     throw error;
   }
 };

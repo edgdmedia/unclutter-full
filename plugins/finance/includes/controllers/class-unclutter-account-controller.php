@@ -18,7 +18,7 @@ class Unclutter_Account_Controller
             [
                 'methods' => 'GET',
                 'callback' => [self::class, 'get_accounts'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
                 'args' => [
                     'type_id' => [
                         'required' => false,
@@ -37,7 +37,7 @@ class Unclutter_Account_Controller
             [
                 'methods' => 'POST',
                 'callback' => [self::class, 'create_account'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
                 'args' => [
                     'name' => [
                         'required' => true,
@@ -78,12 +78,12 @@ class Unclutter_Account_Controller
             [
                 'methods' => 'GET',
                 'callback' => [self::class, 'get_account'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             ],
             [
                 'methods' => 'PUT',
                 'callback' => [self::class, 'update_account'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
                 'args' => [
                     'name' => [
                         'required' => false,
@@ -126,7 +126,7 @@ class Unclutter_Account_Controller
             [
                 'methods' => 'DELETE',
                 'callback' => [self::class, 'delete_account'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             ],
         ]);
 
@@ -134,7 +134,7 @@ class Unclutter_Account_Controller
         register_rest_route('api/v1/finance', '/accounts/(?P<id>\d+)/balance-history', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_balance_history'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'start_date' => [
                     'required' => false,
@@ -155,7 +155,7 @@ class Unclutter_Account_Controller
         register_rest_route('api/v1/finance', '/accounts/search', [
             'methods' => 'GET',
             'callback' => [self::class, 'search_accounts'],
-            'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             'args' => [
                 'search' => [
                     'required' => true,
@@ -171,7 +171,7 @@ class Unclutter_Account_Controller
             [
                 'methods' => 'GET',
                 'callback' => [self::class, 'get_account_transactions'],
-                'permission_callback' => [Unclutter_Finance_Utils::class, 'auth_required'],
+                'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
             ],
         ]);
     }
@@ -185,7 +185,7 @@ class Unclutter_Account_Controller
      */
     public static function get_accounts($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -220,21 +220,16 @@ class Unclutter_Account_Controller
      */
     public static function get_account($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $id = $request->get_param('id');
-        $account = Unclutter_Account_Service::get_account($id);
+        $account = Unclutter_Account_Service::get_account($profile_id, $id);
 
         if (!$account) {
             return new WP_REST_Response(['success' => false, 'message' => 'Account not found'], 404);
-        }
-
-        // Check if the account belongs to the user
-        if ($account->profile_id != $profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         return new WP_REST_Response(['success' => true, 'account' => $account], 200);
@@ -248,7 +243,7 @@ class Unclutter_Account_Controller
      */
     public static function create_account($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -304,21 +299,16 @@ class Unclutter_Account_Controller
      */
     public static function update_account($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $id = $request->get_param('id');
-        $account = Unclutter_Account_Service::get_account($id);
+        $account = Unclutter_Account_Service::get_account($profile_id, $id);
 
         if (!$account) {
             return new WP_REST_Response(['success' => false, 'message' => 'Account not found'], 404);
-        }
-
-        // Check if the account belongs to the user
-        if ($account->profile_id != $profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $params = $request->get_json_params();
@@ -357,14 +347,14 @@ class Unclutter_Account_Controller
         }
 
         // Update account
-        $updated = Unclutter_Account_Service::update_account($id, $data);
+        $updated = Unclutter_Account_Service::update_account($profile_id, $id, $data);
 
         if (!$updated) {
             return new WP_REST_Response(['success' => false, 'message' => 'Failed to update account'], 500);
         }
 
         // Get the updated account
-        $account = Unclutter_Account_Service::get_account($id);
+        $account = Unclutter_Account_Service::get_account($profile_id, $id);
 
         return new WP_REST_Response(['success' => true, 'account' => $account], 200);
     }
@@ -377,25 +367,20 @@ class Unclutter_Account_Controller
      */
     public static function delete_account($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $id = $request->get_param('id');
-        $account = Unclutter_Account_Service::get_account($id);
+        $account = Unclutter_Account_Service::get_account($profile_id, $id);
 
         if (!$account) {
             return new WP_REST_Response(['success' => false, 'message' => 'Account not found'], 404);
         }
 
-        // Check if the account belongs to the user
-        if ($account->profile_id != $profile_id) {
-            return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-
         // Delete account
-        $deleted = Unclutter_Account_Service::delete_account($id);
+        $deleted = Unclutter_Account_Service::delete_account($profile_id, $id);
 
         if (!$deleted) {
             return new WP_REST_Response(['success' => false, 'message' => 'Failed to delete account'], 500);
@@ -412,7 +397,7 @@ class Unclutter_Account_Controller
      */
     public static function get_balance_history($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -447,7 +432,7 @@ class Unclutter_Account_Controller
      */
     public static function search_accounts($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -471,7 +456,7 @@ class Unclutter_Account_Controller
      */
     public static function get_account_transactions($request)
     {
-        $profile_id = Unclutter_Finance_Utils::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }

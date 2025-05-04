@@ -6,32 +6,32 @@ class Unclutter_Subscription_Controller {
         register_rest_route('api/v1/subscription', '/me', [
             'methods' => 'GET',
             'callback' => [self::class, 'get_subscription'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
         register_rest_route('api/v1/subscription', '/update', [
             'methods' => 'POST',
             'callback' => [self::class, 'update_subscription'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
         register_rest_route('api/v1/subscription', '/check-entitlement', [
             'methods' => 'POST',
             'callback' => [self::class, 'check_entitlement'],
-            'permission_callback' => [self::class, 'auth_required'],
+            'permission_callback' => [Unclutter_Auth_Service::class, 'auth_required'],
         ]);
     }
     public static function get_subscription($request) {
-        $profile_id = self::get_profile_id_from_request($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $subscription = Unclutter_Subscription_Service::get_subscription($profile_id);
         return new WP_REST_Response(['success' => (bool)$subscription, 'subscription' => $subscription], $subscription ? 200 : 404);
     }
     public static function update_subscription($request) {
-        $profile_id = self::get_profile_id_from_request($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $params = $request->get_json_params();
         $result = Unclutter_Subscription_Service::update_subscription($profile_id, $params);
         return new WP_REST_Response(['success' => (bool)$result], $result ? 200 : 400);
     }
     public static function check_entitlement($request) {
-        $profile_id = self::get_profile_id_from_request($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $params = $request->get_json_params();
         $result = Unclutter_Subscription_Service::check_entitlement($profile_id, $params['feature'] ?? '');
         return new WP_REST_Response(['success' => (bool)$result], 200);
@@ -43,10 +43,7 @@ class Unclutter_Subscription_Controller {
         $result = Unclutter_Auth_Service::verify_token($jwt);
         return $result && !empty($result['success']);
     }
-    private static function get_profile_id_from_request($request) {
-        // TODO: Extract profile_id from JWT or request context
-        return (int) ($request['profile_id'] ?? 0);
-    }
+
     public static function get_subscription_data($profile_id) {
         $sub = Unclutter_Subscription_Service::get_subscription($profile_id);
         return ['success' => !!$sub, 'subscription' => $sub];

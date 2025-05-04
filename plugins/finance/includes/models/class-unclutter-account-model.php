@@ -50,7 +50,7 @@ class Unclutter_Account_Model extends Unclutter_Base_Model {
      * @param array $data Account data
      * @return bool True on success, false on failure
      */
-    public static function update_account($id, $data) {
+    public static function update_account($profile_id, $id, $data) {
         global $wpdb;
         $table = self::get_table_name();
         
@@ -61,7 +61,7 @@ class Unclutter_Account_Model extends Unclutter_Base_Model {
         $result = $wpdb->update(
             $table,
             $data,
-            ['id' => $id]
+            ['id' => $id, 'profile_id' => $profile_id]
         );
         
         return $result !== false;
@@ -92,7 +92,7 @@ class Unclutter_Account_Model extends Unclutter_Base_Model {
      * @param int $id Account ID
      * @return object|null Account object or null if not found
      */
-    public static function get_account($id) {
+    public static function get_account($profile_id, $id) {
         global $wpdb;
         $table = self::get_table_name();
         $category_table = $wpdb->prefix . 'unclutter_finance_categories';
@@ -101,8 +101,8 @@ class Unclutter_Account_Model extends Unclutter_Base_Model {
             "SELECT a.*, c.name as type_name, c.type as category_type 
             FROM $table a 
             LEFT JOIN $category_table c ON a.type_id = c.id 
-            WHERE a.id = %d",
-            $id
+            WHERE a.id = %d AND a.profile_id = %d",
+            $id, $profile_id
         ));
     }
     
@@ -190,7 +190,7 @@ class Unclutter_Account_Model extends Unclutter_Base_Model {
      * @param float $amount Amount to add (positive) or subtract (negative)
      * @return bool True on success, false on failure
      */
-    public static function update_balance($id, $amount) {
+    public static function update_balance($profile_id, $id, $amount) {
         global $wpdb;
         $table = self::get_table_name();
         
@@ -208,7 +208,7 @@ class Unclutter_Account_Model extends Unclutter_Base_Model {
         $new_balance = (float) $current_balance + (float) $amount;
         
         // Update balance
-        return self::update_account($id, ['balance' => $new_balance]);
+        return self::update_account($profile_id, $id, ['balance' => $new_balance]);
     }
     
     /**

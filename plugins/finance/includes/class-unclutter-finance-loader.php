@@ -12,7 +12,16 @@ class Unclutter_Finance_Loader {
      */
     public static function init() {
         self::load_dependencies();
+        self::run_updates();
         self::register_hooks();
+    }
+    
+    /**
+     * Run database updates
+     */
+    private static function run_updates() {
+        require_once UNCLUTTER_FINANCE_PLUGIN_DIR . 'includes/install/class-unclutter-finance-db-updater.php';
+        Unclutter_Finance_DB_Updater::update();
     }
     
     /**

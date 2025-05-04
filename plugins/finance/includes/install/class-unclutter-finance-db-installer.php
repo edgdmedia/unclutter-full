@@ -61,6 +61,7 @@ class Unclutter_Finance_DB_Installer {
             profile_id BIGINT UNSIGNED NOT NULL,
             account_id BIGINT UNSIGNED NOT NULL,
             category_id BIGINT UNSIGNED NOT NULL,
+            destination_account_id BIGINT UNSIGNED NULL,
             amount DECIMAL(15,2) NOT NULL,
             transaction_date DATE NOT NULL,
             description VARCHAR(255),

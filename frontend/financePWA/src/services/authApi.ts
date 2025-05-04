@@ -59,11 +59,11 @@ export async function forgotPassword(email: string) {
   return data;
 }
 
-export async function resetPassword(email: string, code: string, password: string) {
+export async function resetPassword(email: string, code: string, new_password: string) {
   const res = await fetch(`${API}/reset-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, code, password })
+    body: JSON.stringify({ email, code, new_password })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Reset failed');

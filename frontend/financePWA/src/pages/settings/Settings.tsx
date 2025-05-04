@@ -56,8 +56,8 @@ const NotificationSchema = z.object({
 });
 
 const Settings: React.FC = () => {
-  const { user } = useFinance();
-  const { logout } = useAuth();
+  const { user: financeUser } = useFinance();
+  const { user: authUser, isAuthenticated, logout, updateUserProfile } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState({
@@ -71,10 +71,10 @@ const Settings: React.FC = () => {
   const profileForm = useForm({
     resolver: zodResolver(ProfileSchema),
     defaultValues: {
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
+      firstName: authUser?.first_name || financeUser?.firstName || '',
+      lastName: authUser?.last_name || financeUser?.lastName || '',
+      email: authUser?.email || financeUser?.email || '',
+      phone: financeUser?.phone || '',
     },
   });
 
@@ -107,6 +107,15 @@ const Settings: React.FC = () => {
       weeklyReports: true,
     },
   });
+
+  // Update form when auth user changes
+  useEffect(() => {
+    if (authUser) {
+      profileForm.setValue('firstName', authUser.first_name || '');
+      profileForm.setValue('lastName', authUser.last_name || '');
+      profileForm.setValue('email', authUser.email || '');
+    }
+  }, [authUser, profileForm]);
 
   // Load user settings on component mount
   useEffect(() => {
@@ -184,28 +193,30 @@ const Settings: React.FC = () => {
   const onProfileSubmit = async (values: z.infer<typeof ProfileSchema>) => {
     try {
       setIsLoading(prev => ({ ...prev, profile: true }));
-      console.log('Updating profile:', values);
       
-      // Save to API
+      // Send to API
       const result = await userApi.updateUserProfile(values);
       
-      // Save to IndexedDB for offline use
-      await dbService.saveUserSettings('profile', values);
-      
-      toast.success('Profile updated successfully!');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
-      
-      // If API fails but we're online, still save to IndexedDB
-      if (navigator.onLine) {
-        try {
-          await dbService.saveUserSettings('profile', values);
-          toast.info('Profile saved locally, will sync when online');
-        } catch (dbError) {
-          console.error('Error saving profile to IndexedDB:', dbError);
+      if (result.success) {
+        toast.success('Profile updated successfully!');
+        // Update user data in auth context if user exists
+        if (authUser) {
+          updateUserProfile({
+            first_name: values.firstName,
+            last_name: values.lastName,
+            display_name: `${values.firstName} ${values.lastName}`,
+            email: values.email
+          });
         }
+        // Save to IndexedDB for offline use
+        await dbService.saveUserSettings('profile', values);
+      } else {
+        throw new Error(result.message || 'Failed to update profile');
       }
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      const errorMessage = error?.response?.data?.message || 'Failed to update profile';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(prev => ({ ...prev, profile: false }));
     }
@@ -214,7 +225,6 @@ const Settings: React.FC = () => {
   const onPasswordSubmit = async (values: z.infer<typeof PasswordSchema>) => {
     try {
       setIsLoading(prev => ({ ...prev, password: true }));
-      console.log('Changing password');
       
       // Send to API
       await userApi.changePassword({
@@ -224,9 +234,10 @@ const Settings: React.FC = () => {
       
       toast.success('Password changed successfully!');
       passwordForm.reset();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error changing password:', error);
-      toast.error('Failed to change password');
+      const errorMessage = error?.response?.data?.message || 'Failed to change password';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(prev => ({ ...prev, password: false }));
     }
@@ -378,6 +389,9 @@ const Settings: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Update your password to keep your account secure.
+              </p>
             </CardHeader>
             <CardContent>
               <Form {...passwordForm}>
@@ -389,7 +403,7 @@ const Settings: React.FC = () => {
                       <FormItem>
                         <FormLabel>Current Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -402,9 +416,12 @@ const Settings: React.FC = () => {
                       <FormItem>
                         <FormLabel>New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
+                        <p className="text-xs text-muted-foreground">
+                          Password must be at least 8 characters long.
+                        </p>
                       </FormItem>
                     )}
                   />
@@ -415,13 +432,22 @@ const Settings: React.FC = () => {
                       <FormItem>
                         <FormLabel>Confirm New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">Change Password</Button>
+                  <Button type="submit" disabled={isLoading.password}>
+                    {isLoading.password ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin">⏳</span>
+                        Updating...
+                      </>
+                    ) : (
+                      'Change Password'
+                    )}
+                  </Button>
                 </form>
               </Form>
             </CardContent>
