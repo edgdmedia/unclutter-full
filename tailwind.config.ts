@@ -64,8 +64,9 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				finance: {
-					yellow: '#FFD60A',
-					blue: '#1A365D',
+					yellow: '#F7B928',
+					brown: '#2D2A26',
+					blue: '#2D2A26', // Keeping blue for backward compatibility but using brown
 					green: '#4CAF50',
 					red: '#F44336',
 					'light-gray': '#F1F0FB',

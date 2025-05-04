@@ -19,7 +19,7 @@
     --primary: 48 100% 52%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 222 63% 24%;
+    --secondary: 20 5% 16%; /* #2D2A26 in HSL */
     --secondary-foreground: 210 40% 98%;
 
     --muted: 210 40% 96.1%;
@@ -37,30 +37,30 @@
 
     --radius: 0.5rem;
 
-    --sidebar-background: 222 63% 24%;
+    --sidebar-background: 20 5% 16%; /* #2D2A26 in HSL */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 48 100% 52%;
-    --sidebar-primary-foreground: 222 63% 24%;
-    --sidebar-accent: 222 40% 20%;
+    --sidebar-primary: 42 93% 56%; /* #F7B928 in HSL */
+    --sidebar-primary-foreground: 20 5% 16%; /* #2D2A26 in HSL */
+    --sidebar-accent: 20 5% 16%; /* #2D2A26 in HSL */
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 30% 30%;
+    --sidebar-border: 20 5% 26%; /* Slightly lighter than #2D2A26 */
     --sidebar-ring: 48 100% 52%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 20 5% 10%; /* Darker version of #2D2A26 */
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 20 5% 12%; /* Dark version of #2D2A26 */
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 20 5% 12%; /* Dark version of #2D2A26 */
     --popover-foreground: 210 40% 98%;
 
     --primary: 48 100% 52%;
     --primary-foreground: 222 63% 24%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 20 5% 16%; /* #2D2A26 in HSL */
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217.2 32.6% 17.5%;
@@ -75,13 +75,13 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 222 20% 15%;
+    --sidebar-background: 20 5% 13%; /* Darker #2D2A26 in HSL */
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 48 100% 52%;
-    --sidebar-primary-foreground: 222 63% 24%;
-    --sidebar-accent: 222 20% 20%;
+    --sidebar-primary: 42 93% 56%; /* #F7B928 in HSL */
+    --sidebar-primary-foreground: 20 5% 16%; /* #2D2A26 in HSL */
+    --sidebar-accent: 20 5% 16%; /* #2D2A26 in HSL */
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222 20% 25%;
+    --sidebar-border: 20 5% 20%; /* Darker than #2D2A26 */
     --sidebar-ring: 48 100% 52%;
   }
 }

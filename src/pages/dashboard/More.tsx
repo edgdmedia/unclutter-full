@@ -10,11 +10,11 @@ import {
   Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useFinance } from '@/context/FinanceContext';
+import { useAuth } from '@/context/AuthContext';
 
 const More: React.FC = () => {
   const navigate = useNavigate();
-  const { logout } = useFinance();
+  const { logout } = useAuth();
 
   const menuItems = [
     {
@@ -43,8 +43,8 @@ const More: React.FC = () => {
     },
   ];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

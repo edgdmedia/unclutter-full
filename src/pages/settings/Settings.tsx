@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,7 +18,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFinance } from '@/context/FinanceContext';
+import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/sonner';
+import * as userApi from '@/services/userApi';
+import * as dbService from '@/services/dbService';
+import { useNavigate } from 'react-router-dom';
 
 const ProfileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -52,16 +56,25 @@ const NotificationSchema = z.object({
 });
 
 const Settings: React.FC = () => {
-  const { user } = useFinance();
+  const { user: financeUser } = useFinance();
+  const { user: authUser, isAuthenticated, logout, updateUserProfile } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
+  const [isLoading, setIsLoading] = useState({
+    profile: false,
+    password: false,
+    preferences: false,
+    notifications: false,
+    logout: false
+  });
 
   const profileForm = useForm({
     resolver: zodResolver(ProfileSchema),
     defaultValues: {
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
+      firstName: authUser?.first_name || financeUser?.firstName || '',
+      lastName: authUser?.last_name || financeUser?.lastName || '',
+      email: authUser?.email || financeUser?.email || '',
+      phone: financeUser?.phone || '',
     },
   });
 
@@ -77,7 +90,7 @@ const Settings: React.FC = () => {
   const preferencesForm = useForm({
     resolver: zodResolver(PreferencesSchema),
     defaultValues: {
-      currency: 'USD',
+      currency: 'NGN',
       dateFormat: 'MM/DD/YYYY',
       startOfMonth: '1',
       language: 'en',
@@ -95,40 +108,215 @@ const Settings: React.FC = () => {
     },
   });
 
-  const onProfileSubmit = (values: z.infer<typeof ProfileSchema>) => {
-    console.log(values);
-    toast.success('Profile updated successfully!');
+  // Update form when auth user changes
+  useEffect(() => {
+    if (authUser) {
+      profileForm.setValue('firstName', authUser.first_name || '');
+      profileForm.setValue('lastName', authUser.last_name || '');
+      profileForm.setValue('email', authUser.email || '');
+    }
+  }, [authUser, profileForm]);
+
+  // Load user settings on component mount
+  useEffect(() => {
+    const loadUserSettings = async () => {
+      try {
+        // Try to load profile from API first
+        try {
+          const profileData = await userApi.getUserProfile();
+          if (profileData?.success) {
+            profileForm.reset({
+              firstName: profileData.data.firstName,
+              lastName: profileData.data.lastName,
+              email: profileData.data.email,
+              phone: profileData.data.phone || '',
+            });
+            // Save to IndexedDB for offline use
+            await dbService.saveUserSettings('profile', profileData.data);
+          }
+        } catch (error) {
+          console.error('Error loading profile from API, trying IndexedDB:', error);
+          // If API fails, try to load from IndexedDB
+          const localProfile = await dbService.getUserSettings('profile');
+          if (localProfile) {
+            profileForm.reset({
+              firstName: localProfile.firstName,
+              lastName: localProfile.lastName,
+              email: localProfile.email,
+              phone: localProfile.phone || '',
+            });
+          }
+        }
+
+        // Load preferences
+        try {
+          const preferencesData = await userApi.getUserPreferences();
+          if (preferencesData?.success) {
+            preferencesForm.reset(preferencesData.data);
+            // Save to IndexedDB for offline use
+            await dbService.saveUserSettings('preferences', preferencesData.data);
+          }
+        } catch (error) {
+          console.error('Error loading preferences from API, trying IndexedDB:', error);
+          // If API fails, try to load from IndexedDB
+          const localPreferences = await dbService.getUserSettings('preferences');
+          if (localPreferences) {
+            preferencesForm.reset(localPreferences);
+          }
+        }
+
+        // Load notification settings
+        try {
+          const notificationsData = await userApi.getUserNotifications();
+          if (notificationsData?.success) {
+            notificationForm.reset(notificationsData.data);
+            // Save to IndexedDB for offline use
+            await dbService.saveUserSettings('notifications', notificationsData.data);
+          }
+        } catch (error) {
+          console.error('Error loading notifications from API, trying IndexedDB:', error);
+          // If API fails, try to load from IndexedDB
+          const localNotifications = await dbService.getUserSettings('notifications');
+          if (localNotifications) {
+            notificationForm.reset(localNotifications);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user settings:', error);
+        toast.error('Failed to load settings');
+      }
+    };
+
+    loadUserSettings();
+  }, []);
+
+  const onProfileSubmit = async (values: z.infer<typeof ProfileSchema>) => {
+    try {
+      setIsLoading(prev => ({ ...prev, profile: true }));
+      
+      // Send to API
+      const result = await userApi.updateUserProfile(values);
+      
+      if (result.success) {
+        toast.success('Profile updated successfully!');
+        // Update user data in auth context if user exists
+        if (authUser) {
+          updateUserProfile({
+            first_name: values.firstName,
+            last_name: values.lastName,
+            display_name: `${values.firstName} ${values.lastName}`,
+            email: values.email
+          });
+        }
+        // Save to IndexedDB for offline use
+        await dbService.saveUserSettings('profile', values);
+      } else {
+        throw new Error(result.message || 'Failed to update profile');
+      }
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      const errorMessage = error?.response?.data?.message || 'Failed to update profile';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(prev => ({ ...prev, profile: false }));
+    }
   };
 
-  const onPasswordSubmit = (values: z.infer<typeof PasswordSchema>) => {
-    console.log(values);
-    toast.success('Password changed successfully!');
-    passwordForm.reset();
+  const onPasswordSubmit = async (values: z.infer<typeof PasswordSchema>) => {
+    try {
+      setIsLoading(prev => ({ ...prev, password: true }));
+      
+      // Send to API
+      await userApi.changePassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword
+      });
+      
+      toast.success('Password changed successfully!');
+      passwordForm.reset();
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      const errorMessage = error?.response?.data?.message || 'Failed to change password';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(prev => ({ ...prev, password: false }));
+    }
   };
 
-  const onPreferencesSubmit = (values: z.infer<typeof PreferencesSchema>) => {
-    console.log(values);
-    toast.success('Preferences updated successfully!');
+  const onPreferencesSubmit = async (values: z.infer<typeof PreferencesSchema>) => {
+    try {
+      setIsLoading(prev => ({ ...prev, preferences: true }));
+      console.log('Updating preferences:', values);
+      
+      // Save to API
+      await userApi.updateUserPreferences(values);
+      
+      // Save to IndexedDB for offline use
+      await dbService.saveUserSettings('preferences', values);
+      
+      toast.success('Preferences updated successfully!');
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      toast.error('Failed to update preferences');
+      
+      // If API fails but we're online, still save to IndexedDB
+      if (navigator.onLine) {
+        try {
+          await dbService.saveUserSettings('preferences', values);
+          toast.info('Preferences saved locally, will sync when online');
+        } catch (dbError) {
+          console.error('Error saving preferences to IndexedDB:', dbError);
+        }
+      }
+    } finally {
+      setIsLoading(prev => ({ ...prev, preferences: false }));
+    }
   };
 
-  const onNotificationSubmit = (values: z.infer<typeof NotificationSchema>) => {
-    console.log(values);
-    toast.success('Notification settings updated successfully!');
+  const onNotificationSubmit = async (values: z.infer<typeof NotificationSchema>) => {
+    try {
+      setIsLoading(prev => ({ ...prev, notifications: true }));
+      console.log('Updating notification settings:', values);
+      
+      // Save to API
+      await userApi.updateUserNotifications(values);
+      
+      // Save to IndexedDB for offline use
+      await dbService.saveUserSettings('notifications', values);
+      
+      toast.success('Notification settings updated successfully!');
+    } catch (error) {
+      console.error('Error updating notification settings:', error);
+      toast.error('Failed to update notification settings');
+      
+      // If API fails but we're online, still save to IndexedDB
+      if (navigator.onLine) {
+        try {
+          await dbService.saveUserSettings('notifications', values);
+          toast.info('Notification settings saved locally, will sync when online');
+        } catch (dbError) {
+          console.error('Error saving notification settings to IndexedDB:', dbError);
+        }
+      }
+    } finally {
+      setIsLoading(prev => ({ ...prev, notifications: false }));
+    }
   };
+  
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
       <h1 className="text-2xl font-bold">Settings</h1>
 
-      <Tabs defaultValue="profile" onValueChange={setActiveTab} value={activeTab}>
-        <TabsList className="grid grid-cols-4 w-full max-w-3xl">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="profile">
+      <div className="flex justify-between items-center mb-4">
+        <Tabs defaultValue="profile" onValueChange={setActiveTab} value={activeTab} className="flex-1">
+          <TabsList className="grid grid-cols-4 w-full max-w-3xl">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="preferences">Preferences</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          </TabsList>
+          <TabsContent value="profile">
           <Card>
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
@@ -201,6 +389,9 @@ const Settings: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Change Password</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Update your password to keep your account secure.
+              </p>
             </CardHeader>
             <CardContent>
               <Form {...passwordForm}>
@@ -212,7 +403,7 @@ const Settings: React.FC = () => {
                       <FormItem>
                         <FormLabel>Current Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -225,9 +416,12 @@ const Settings: React.FC = () => {
                       <FormItem>
                         <FormLabel>New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
+                        <p className="text-xs text-muted-foreground">
+                          Password must be at least 8 characters long.
+                        </p>
                       </FormItem>
                     )}
                   />
@@ -238,13 +432,22 @@ const Settings: React.FC = () => {
                       <FormItem>
                         <FormLabel>Confirm New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" {...field} />
+                          <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit">Change Password</Button>
+                  <Button type="submit" disabled={isLoading.password}>
+                    {isLoading.password ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin">⏳</span>
+                        Updating...
+                      </>
+                    ) : (
+                      'Change Password'
+                    )}
+                  </Button>
                 </form>
               </Form>
             </CardContent>
@@ -273,6 +476,7 @@ const Settings: React.FC = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
+                              <SelectItem value="NGN">NGN (₦)</SelectItem>
                               <SelectItem value="USD">USD ($)</SelectItem>
                               <SelectItem value="EUR">EUR (€)</SelectItem>
                               <SelectItem value="GBP">GBP (£)</SelectItem>
@@ -477,7 +681,8 @@ const Settings: React.FC = () => {
         </TabsContent>
       </Tabs>
     </div>
-  );
+    </div>
+)
 };
 
 export default Settings;
