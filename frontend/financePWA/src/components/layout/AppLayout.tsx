@@ -126,6 +126,11 @@ App was installed!`);
               </div>
             </div>
           )}
+          
+          {/* Version display - always visible */}
+          <div className="fixed bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-500">
+            Version {import.meta.env.VITE_APP_VERSION || '1.0.0'} | {new Date().getFullYear()}
+          </div>
         </main>
       </div>
       {isMobile && <BottomNav />}
