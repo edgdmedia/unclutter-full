@@ -8,6 +8,7 @@ import AccountFormDialog from '@/components/accounts/AccountFormDialog';
 import DeleteAccountDialog from '@/components/accounts/DeleteAccountDialog';
 import { toast } from '@/components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency } from '@/utils/formatters';
 
 const Accounts: React.FC = () => {
   const {
@@ -135,7 +136,7 @@ const Accounts: React.FC = () => {
           <div className="text-center py-4">
             <p className="text-sm text-muted-foreground">Total Balance</p>
             <h2 className="text-3xl font-bold text-finance-blue">
-              ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(totalBalance)}
             </h2>
           </div>
         </CardContent>
@@ -162,7 +163,7 @@ const Accounts: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`font-semibold ${parseFloat(account.balance) >= 0 ? 'text-finance-green' : 'text-finance-red'}`}>
-                        ${Math.abs(parseFloat(account.balance)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(Math.abs(parseFloat(account.balance)))}
                       </span>
                       <div className="flex">
                         <Button 

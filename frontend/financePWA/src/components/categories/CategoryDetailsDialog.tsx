@@ -34,11 +34,20 @@ interface CategoryDetails {
   subcategories: Category[];
 }
 
+interface CategoryDetailsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  category: Category | null;
+  onAddSubcategory?: (parentId: string) => void;
+  onEditCategory?: (category: Category) => void;
+}
+
 const CategoryDetailsDialog: React.FC<CategoryDetailsDialogProps> = ({
   open,
   onOpenChange,
   category,
   onAddSubcategory,
+  onEditCategory,
 }) => {
   const [details, setDetails] = useState<CategoryDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,57 +106,31 @@ const CategoryDetailsDialog: React.FC<CategoryDetailsDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle className="text-xl flex items-center gap-2">
-            <span className="capitalize">{category.name}</span>
-            <span className="text-xs bg-muted px-2 py-1 rounded-full capitalize">
-              {category.type}
-            </span>
+          <DialogTitle className="flex items-center gap-2">
+            {category.name}
+            {onEditCategory && (
+              <button
+                className="ml-2 p-1 rounded hover:bg-muted"
+                title="Edit Category"
+                onClick={() => onEditCategory(category)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13h3l8-8a2.828 2.828 0 00-4-4l-8 8v3zm0 0v3m0 0H6m3 0h3" /></svg>
+              </button>
+            )}
           </DialogTitle>
-          <DialogDescription>{category.description || 'No description'}</DialogDescription>
+          <DialogDescription className="text-left">{category.description || 'No description'}</DialogDescription>
         </DialogHeader>
-        
         <div className="py-4">
-          {loading ? (
-            <div className="flex justify-center py-8">Loading...</div>
-          ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Type</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="font-medium capitalize">{category.type}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Usage Count</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="font-medium">{category.usageCount || 0}</div>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              {categoriesApi.isGlobalCategory(category) && (
-                <div className="bg-blue-50 text-blue-800 p-3 rounded-md text-sm">
-                  This is a global category and cannot be modified.
-                </div>
-              )}
-              
               <div className="flex justify-end gap-2 mt-6">
-                {!categoriesApi.isGlobalCategory(category) && (
-                  <Button variant="outline" onClick={handleAddSubcategory}>
-                    <Plus className="h-4 w-4 mr-1" /> Add Subcategory
-                  </Button>
-                )}
+                <Button variant="outline" onClick={handleAddSubcategory}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Subcategory
+                </Button>
                 <Button onClick={handleViewFullDetails}>
                   <ExternalLink className="h-4 w-4 mr-1" /> View Full Details
                 </Button>
               </div>
             </div>
-          )}
         </div>
 
           {/* Tabs removed - simplified view */}

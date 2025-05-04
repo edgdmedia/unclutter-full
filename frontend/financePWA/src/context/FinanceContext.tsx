@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as accountsApi from '../services/accountsApi';
 import * as dashboardApi from '../services/dashboardApi';
@@ -81,11 +80,12 @@ interface FinanceContextType {
   fetchTransactionsByAccount: (accountId: string) => Promise<void>;
   addAccount: (data: Partial<Account>) => Promise<void>;
   updateAccount: (id: string, data: Partial<Account>) => Promise<void>;
-  deleteAccount: (id: string) => Promise<void>;
+  deleteAccount: (id: string) => void;
   getAccount: (id: string) => Promise<Account | null>;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   updateTransaction: (transaction: Transaction) => void;
   deleteTransaction: (id: string) => void;
+  setCategories: React.Dispatch<React.SetStateAction<Category[]>>; 
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -116,6 +116,56 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     initializeDb();
   }, []);
+  
+  // Effect to detect when forceRefresh flag is set and refresh all data
+  useEffect(() => {
+    const checkForRefresh = () => {
+      const forceRefresh = sessionStorage.getItem('forceRefresh');
+      const lastCacheReset = sessionStorage.getItem('lastCacheReset');
+      
+      if (forceRefresh === 'true' && isAuthenticated) {
+        console.log('Force refresh detected, fetching fresh data...');
+        
+        // Clear the flag immediately to prevent multiple refreshes
+        sessionStorage.removeItem('forceRefresh');
+        
+        // Reset all state data
+        setAccounts([]);
+        setTransactions([]);
+        setBudgets([]);
+        setGoals([]);
+        setCategories([]);
+        setDashboardSummary(null);
+        setDashboardTrends(null);
+        
+        // Fetch all data in parallel
+        Promise.all([
+          fetchDashboardSummary(),
+          fetchDashboardTrends(),
+          fetchTransactions(20),
+          fetchAccounts(),
+          fetchCategories()
+        ]).catch(error => {
+          console.error('Error refreshing data:', error);
+        }).finally(() => {
+          console.log('Data refresh complete');
+        });
+      }
+    };
+    
+    // Check immediately when the component mounts or isAuthenticated changes
+    checkForRefresh();
+    
+    // Also set up a storage event listener to detect changes from other tabs/windows
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'forceRefresh' && event.newValue === 'true') {
+        checkForRefresh();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isAuthenticated]);
   
   // Fetch accounts from API with IndexedDB caching
   const fetchAccounts = async () => {
@@ -627,36 +677,78 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
 
 
-  // Login function - using real API
+  // Function to reset all data and clear caches
+  const resetAllData = async () => {
+    console.log('Resetting all data and clearing caches');
+    
+    // 1. Clear all state
+    setAccounts([]);
+    setTransactions([]);
+    setBudgets([]);
+    setGoals([]);
+    setCategories([]);
+    setDashboardSummary(null);
+    setDashboardTrends(null);
+    
+    // 2. Clear localStorage cache
+    const keysToRemove = [
+      'dashboardSummary', 'dashboardTrends', 'transactions', 'accounts', 'categories',
+      'budgets', 'goals', 'preferences', 'notifications'
+    ];
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // 3. Clear IndexedDB cache
+    if (db) {
+      try {
+        const storeNames = Array.from(db.objectStoreNames);
+        if (storeNames.length > 0) {
+          const tx = db.transaction(storeNames, 'readwrite');
+          storeNames.forEach(storeName => {
+            console.log(`Clearing IndexedDB store: ${storeName}`);
+            tx.objectStore(storeName).clear();
+          });
+        }
+      } catch (error) {
+        console.error('Error clearing IndexedDB:', error);
+      }
+    }
+  };
+
+  // Login function - using real API and always fetching fresh data
   const login = async (email: string, password: string): Promise<void> => {
     try {
       console.log('Calling real login API with:', email);
+      
+      // First reset all data to ensure we start fresh
+      await resetAllData();
       
       // Call the real login API
       const response = await authApi.login(email, password);
       console.log('Login response:', response);
       
-      // The token is already saved in localStorage by authApi.login
-      // We just need to set the user data and authenticated state
-      
       // Set user data from response or use minimal data if not available
       setUser(response.user || { id: '1', name: 'User', email: email });
-      
-      // Initialize with empty arrays to prevent null reference errors
-      setAccounts([]);
-      setTransactions([]);
-      setBudgets([]);
-      setGoals([]);
-      setCategories([]);
       
       // Set authenticated to trigger API calls
       console.log('Setting isAuthenticated to true to trigger data fetching');
       setIsAuthenticated(true);
       
-      console.log('Login successful, authenticated:', true);
-      console.log('Token in localStorage:', localStorage.getItem('token'));
+      // Explicitly fetch fresh data instead of relying on useEffect
+      console.log('Explicitly fetching fresh data after login');
       
-      // The useEffect will automatically fetch accounts and dashboard data
+      // Fetch data in parallel for better performance
+      await Promise.all([
+        fetchDashboardSummary(),
+        fetchDashboardTrends(),
+        fetchTransactions(20),
+        fetchAccounts(),
+        fetchCategories()
+      ]).catch(error => {
+        console.error('Error fetching initial data:', error);
+        // Continue even if some fetches fail
+      });
+      
+      console.log('Login and data refresh complete');
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -750,36 +842,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     savings: dashboardSummary ? (dashboardSummary.total_income - dashboardSummary.total_expenses) : 0
   };
 
+  const value = {
+    user,
+    accounts,
+    transactions,
+    budgets,
+    goals,
+    categories,
+    isAuthenticated,
+    financialSummary,
+    dashboardSummary,
+    dashboardTrends,
+    login,
+    logout,
+    fetchAccounts,
+    fetchCategories,
+    fetchDashboardSummary,
+    fetchDashboardTrends,
+    fetchTransactions,
+    fetchTransactionsByAccount,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    getAccount,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    setCategories,
+  };
+
   return (
-    <FinanceContext.Provider
-      value={{
-        user,
-        accounts,
-        transactions,
-        budgets,
-        goals,
-        categories,
-        isAuthenticated,
-        financialSummary,
-        dashboardSummary,
-        dashboardTrends,
-        login,
-        logout,
-        fetchAccounts,
-        fetchCategories,
-        fetchDashboardSummary,
-        fetchDashboardTrends,
-        fetchTransactions,
-        fetchTransactionsByAccount,
-        addAccount,
-        updateAccount,
-        deleteAccount,
-        getAccount,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-      }}
-    >
+    <FinanceContext.Provider value={value}>
       {children}
     </FinanceContext.Provider>
   );

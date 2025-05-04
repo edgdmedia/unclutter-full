@@ -59,9 +59,10 @@ const RegisterPage: React.FC = () => {
       await authApi.register(payload);
       toast({
         title: "Registration successful",
-        description: "Please check your email to verify your account.",
+        description: "Please verify your email with the code sent to your inbox.",
       });
-      navigate("/login");
+      // Redirect to verify email page with the email as state
+      navigate("/verify-email", { state: { email: values.email } });
     } catch (error) {
       toast({
         title: "Registration failed",

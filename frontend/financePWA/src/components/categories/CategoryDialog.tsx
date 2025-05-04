@@ -94,18 +94,22 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
 
   useEffect(() => {
     if (initialCategory) {
+      let safeType = initialCategory.type;
+      if (!safeType || safeType === '') {
+        console.warn('[CategoryDialog] Category missing type:', initialCategory);
+        safeType = categoryType || 'expense';
+      }
       form.reset({
         id: initialCategory.id,
         name: initialCategory.name,
-        type: initialCategory.type,
+        type: safeType,
         description: initialCategory.description || '',
-        parent: initialCategory.parent_id || '',
+        parent: initialCategory.parent || '',
       });
     } else {
       form.reset({
-        id: '',
         name: '',
-        type: categoryType,
+        type: categoryType || 'expense', 
         description: '',
         parent: parentId || '',
       });
@@ -157,7 +161,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
                   <FormLabel>Category Type</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -193,7 +197,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
             />
             
             {/* Parent Category Selection */}
-            <FormField
+            {/* <FormField
               control={form.control}
               name="parent"
               render={({ field }) => (
@@ -201,7 +205,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
                   <FormLabel>Parent Category (Optional)</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value || ""}
+                    value={field.value ?? ""}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -220,7 +224,7 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            /> */}
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">

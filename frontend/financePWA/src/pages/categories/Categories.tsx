@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +9,7 @@ import DeleteCategoryDialog from '@/components/categories/DeleteCategoryDialog';
 import CategoryDetailsDialog from '@/components/categories/CategoryDetailsDialog';
 import { toast } from '@/components/ui/sonner';
 import * as categoriesApi from '@/services/categoriesApi';
+import CategoryList from '@/components/categories/CategoryList';
 
 type CategoryType = 'income' | 'expense' | 'account' | 'tag';
 
@@ -28,7 +28,7 @@ interface Category {
 }
 
 const Categories: React.FC = () => {
-  const { categories, fetchCategories } = useFinance();
+  const { categories, fetchCategories, setCategories } = useFinance();
   const [activeTab, setActiveTab] = useState<CategoryType>('expense');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -63,9 +63,24 @@ const Categories: React.FC = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleViewCategory = (category: Category) => {
+  const handleCategoryClick = async (category: Category) => {
+    // Open dialog immediately with existing info
     setSelectedCategory(category);
     setIsDetailsDialogOpen(true);
+
+    // Fetch latest details in the background
+    try {
+      const response = await categoriesApi.getCategoryDetails(category.id);
+      if (response.success) {
+        // Save or update in local DB (use your own dbService or similar)
+        // Example: await dbService.saveCategory(response.data);
+        // For now, just update selectedCategory with new details
+        setSelectedCategory({ ...category, ...response.data });
+      }
+    } catch (error) {
+      // Optionally handle error
+      // toast.error('Failed to update category details');
+    }
   };
 
   const handleAddSubcategory = (parentId: string) => {
@@ -73,28 +88,54 @@ const Categories: React.FC = () => {
     setIsAddDialogOpen(true);
   };
 
+  const handleViewCategory = (category: Category) => {
+    setSelectedCategory(category);
+    setIsDetailsDialogOpen(true);
+  };
+
   const handleSaveCategory = async (category: Category) => {
     setIsLoading(true);
+    const originalCategories = [...categories]; // Store original state for potential rollback
+    let savedCategory: Category | null = null;
+
     try {
       const categoryData = {
         ...category,
         parent_id: parentCategory
       };
-      
+
       if (editingCategory && editingCategory.id) {
-        // Update existing category
-        await categoriesApi.updateCategory(editingCategory.id, categoryData);
+        // --- Optimistic Update (Edit) ---
+        setCategories(prev => 
+          prev.map(cat => 
+            cat.id === editingCategory.id ? { ...cat, ...categoryData } : cat
+          )
+        );
+        // -------------------------------
+        savedCategory = await categoriesApi.updateCategory(editingCategory.id, categoryData);
         toast.success("Category updated successfully!");
       } else {
-        // Create new category
-        await categoriesApi.createCategory(categoryData);
+        // --- Optimistic Add (Placeholder ID) ---
+        const tempId = `temp-${Date.now()}`;
+        const optimisticCategory = { ...categoryData, id: tempId }; 
+        setCategories(prev => [...prev, optimisticCategory]);
+        // ------------------------------------
+        savedCategory = await categoriesApi.createCategory(categoryData);
         toast.success("Category created successfully!");
+        // --- Update UI with Real ID ---
+        setCategories(prev => 
+          prev.map(cat => 
+            cat.id === tempId ? { ...savedCategory, id: savedCategory.id } : cat
+          )
+        );
+        // ---------------------------
       }
-      // Refresh categories list
-      await fetchCategories();
     } catch (error) {
       console.error('Error saving category:', error);
       toast.error("Failed to save category");
+      // --- Rollback on error ---
+      setCategories(originalCategories);
+      // -----------------------
     } finally {
       setIsLoading(false);
       setIsAddDialogOpen(false);
@@ -106,20 +147,28 @@ const Categories: React.FC = () => {
   const handleConfirmDelete = async () => {
     if (categoryToDelete) {
       setIsLoading(true);
+      const originalCategories = [...categories]; // Store original state for potential rollback
+      const categoryIdToDelete = categoryToDelete.id;
+
+      // --- Optimistic Delete ---
+      setCategories(prev => prev.filter(cat => cat.id !== categoryIdToDelete));
+      // -----------------------
+      
       try {
-        // Check if it's a global category
         if (categoriesApi.isGlobalCategory(categoryToDelete)) {
           toast.error("Cannot delete global categories");
+          setCategories(originalCategories); // Rollback
           return;
         }
-        
-        await categoriesApi.deleteCategory(categoryToDelete.id);
+
+        await categoriesApi.deleteCategory(categoryIdToDelete);
         toast.success(`Category "${categoryToDelete.name}" deleted successfully!`);
-        // Refresh categories list
-        await fetchCategories();
       } catch (error) {
         console.error('Error deleting category:', error);
         toast.error("Failed to delete category");
+        // --- Rollback on error ---
+        setCategories(originalCategories);
+        // -----------------------
       } finally {
         setIsLoading(false);
         setIsDeleteDialogOpen(false);
@@ -152,49 +201,13 @@ const Categories: React.FC = () => {
             <Card>
               <CardContent className="p-4">
                 {filteredCategories.length > 0 ? (
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-12 font-medium py-2 px-3 text-sm border-b">
-                      <div className="col-span-5">Name</div>
-                      <div className="col-span-5">Description</div>
-                      <div className="col-span-1">Usage</div>
-                      <div className="col-span-1 text-right">Actions</div>
-                    </div>
-                    {filteredCategories.map(category => (
-                      <div 
-                        key={category.id} 
-                        className="grid grid-cols-12 items-center py-2 px-3 text-sm hover:bg-muted/50 rounded-md cursor-pointer"
-                        onClick={() => handleViewCategory(category)}
-                      >
-                        <div className="col-span-5 font-medium">{category.name}</div>
-                        <div className="col-span-5 text-muted-foreground truncate">{category.description || '-'}</div>
-                        <div className="col-span-1">{category.usageCount}</div>
-                        <div className="col-span-1 flex justify-end space-x-1" onClick={(e) => e.stopPropagation()}>
-                          {!categoriesApi.isGlobalCategory(category) && (
-                            <>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleEditCategory(category)}
-                                disabled={isLoading}
-                                title="Edit category"
-                              >
-                                <Edit size={16} />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleDeleteCategory(category)}
-                                disabled={isLoading}
-                                title="Delete category"
-                              >
-                                <Trash size={16} />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <CategoryList
+                    categories={filteredCategories}
+                    onCategoryClick={handleCategoryClick}
+                    onEditCategory={handleEditCategory}
+                    onDeleteCategory={handleDeleteCategory}
+                    isLoading={isLoading}
+                  />
                 ) : (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-4">No {tabValue} categories found</p>

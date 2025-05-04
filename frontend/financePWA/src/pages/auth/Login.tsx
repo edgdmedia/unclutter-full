@@ -41,18 +41,20 @@ const LoginPage: React.FC = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "olalekan.owonikoko@gmail.com",
+      email: "demo@demo.com",
       password: "12345678",
       rememberMe: true,
     },
   });
+
+  // We'll let the Dashboard handle data fetching
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
       // Use the login method from AuthContext
       await login(values.email, values.password);
-      // Note: No need to show toast here as it's handled in the AuthContext
+      console.log('Login successful');
       // Redirect is handled by the useEffect that watches isAuthenticated
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Invalid email or password. Please try again.");

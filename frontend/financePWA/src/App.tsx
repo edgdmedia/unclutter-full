@@ -7,6 +7,7 @@ import { FinanceProvider } from '@/context/FinanceContext';
 import { AuthProvider } from '@/context/AuthContext';
 import React, { Suspense, lazy } from 'react';
 import OfflineNotice from '@/components/ui/OfflineNotice';
+import { UpdateNotification } from '@/components/UpdateNotification';
 
 // Layouts
 import AppLayout from "@/components/layout/AppLayout";
@@ -65,6 +66,7 @@ const App = () => {
             <Toaster />
             <Sonner />
             <OfflineNotice />
+            <UpdateNotification />
             <BrowserRouter>
               <Routes>
                 {/* Auth Routes */}

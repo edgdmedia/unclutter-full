@@ -1,0 +1,82 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - prod-financePWA
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version information
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > ./public/version.json << EOL
+          {
+            "version": "$CURRENT_VERSION",
+            "buildDate": "$BUILD_DATE",
+            "notes": "Production release",
+            "requiredUpdate": false,
+            "features": [
+              "Core financial management features",
+              "Offline support",
+              "Background synchronization"
+            ]
+          }
+          EOL
+          echo "Updated version.json with version $CURRENT_VERSION and build date $BUILD_DATE"
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_APP_ENV: production
+          VITE_APP_API_URL: https://finance.unclutter.com.ng/
+          VITE_APP_AUTH_ENABLED: true
+          VITE_APP_VERSION: ${{ github.sha }}
+
+      - name: Deploy to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "dist/*"
+          target: "/home/unclutter/domains/finance.unclutter.com.ng/public_html/"
+          strip_components: 1
+
+      - name: Set permissions
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            find /home/unclutter/domains/finance.unclutter.com.ng/public_html/ -type d -exec chmod 755 {} \;
+            find /home/unclutter/domains/finance.unclutter.com.ng/public_html/ -type f -exec chmod 644 {} \;
+            chown -R unclutter:unclutter /home/unclutter/domains/finance.unclutter.com.ng/public_html/
+
+      - name: Purge cache and restart services
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            # Restart Nginx or any other services if needed
+            sudo systemctl restart nginx
+            # Clear any caches if needed
+            echo "Deployment completed successfully!"

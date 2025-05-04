@@ -418,7 +418,7 @@ class Unclutter_Category_Controller {
      * @return WP_REST_Response
      */
     public static function delete_category($request) {
-        $profile_id = self::get_profile_id_from_token($request);
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         if (!$profile_id) {
             return new WP_REST_Response(['success' => false, 'message' => 'Unauthorized'], 401);
         }

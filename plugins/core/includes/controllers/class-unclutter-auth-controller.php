@@ -236,11 +236,11 @@ class Unclutter_Auth_Controller {
     }
 
     public static function refresh($request) {
+        $profile_id = Unclutter_Auth_Service::get_profile_id_from_token($request);
         $params = $request->get_json_params();
-        $profile_id = $params['profile_id'] ?? 0;
         $refresh_token = $params['refresh_token'] ?? '';
         $result = Unclutter_Auth_Service::refresh_token($profile_id, $refresh_token);
-        return new WP_REST_Response($result, $result['success'] ? 200 : 401);
+        return new WP_REST_Response(['success' => $result['success'], 'data' => $result['access_token']], $result['success'] ? 200 : 401);
     }
 
 }

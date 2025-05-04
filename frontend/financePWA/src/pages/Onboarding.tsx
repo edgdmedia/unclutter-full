@@ -33,11 +33,17 @@ export default function Onboarding({ onFinish }: { onFinish: () => void }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-finance-blue text-white p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white text-gray-800 p-6">
       <div className="max-w-md w-full text-center">
-        <h1 className="text-3xl font-bold mb-4">{slides[step].title}</h1>
-        <p className="mb-8 text-lg">{slides[step].description}</p>
-        <Button onClick={handleNext} className="bg-finance-yellow text-finance-blue w-full">
+        <img 
+          src="/logo.png" 
+          alt="Unclutter Finance Logo" 
+          className="w-24 h-auto mx-auto mb-8" 
+        />
+        
+        <h1 className="text-3xl font-bold mb-4 text-finance-blue">{slides[step].title}</h1>
+        <p className="mb-8 text-lg text-gray-600">{slides[step].description}</p>
+        <Button onClick={handleNext} className="bg-finance-yellow text-finance-blue hover:bg-finance-yellow/90 w-full">
           {step < slides.length - 1 ? 'Next' : 'Get Started'}
         </Button>
       </div>
@@ -45,7 +51,7 @@ export default function Onboarding({ onFinish }: { onFinish: () => void }) {
         {slides.map((_, idx) => (
           <span
             key={idx}
-            className={`inline-block w-3 h-3 rounded-full ${idx === step ? 'bg-finance-yellow' : 'bg-white/30'}`}
+            className={`inline-block w-3 h-3 rounded-full ${idx === step ? 'bg-finance-yellow' : 'bg-gray-300'}`}
           />
         ))}
       </div>

@@ -15,8 +15,8 @@ add_action('init', function () {
     $allowed_origins = [
         'http://localhost:8081',
         'http://localhost:8080',
-        'http://192.168.100.149:8080',
-        'http://192.168.100.149:8081',
+        'http://192.168.100.155:8080',
+        'http://192.168.100.155:8081',
         'https://dash.unclutter.com.ng',
         'https://finance.unclutter.com.ng',
         'https://unclutter.com.ng'

@@ -1,5 +1,20 @@
 import { api } from './apiClient';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
+
+// Create a separate axios instance for non-finance endpoints
+const profileApi = axios.create({
+  baseURL: 'https://dash.unclutter.com.ng/wp-json/api/v1'
+});
+
+// Add auth token to profileApi requests
+profileApi.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // User profile interface
 export interface UserProfile {
@@ -30,7 +45,8 @@ export interface UserNotifications {
 // Get user profile
 export const getUserProfile = async () => {
   try {
-    const res = await api.get('/profile/me');
+    // Use profileApi instance for profile endpoints
+    const res = await profileApi.get('/profile/me');
     return res.data;
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -41,7 +57,8 @@ export const getUserProfile = async () => {
 // Update user profile
 export const updateUserProfile = async (profile: UserProfile) => {
   try {
-    const res = await api.put('/profile/me', profile);
+    // Use profileApi instance for profile endpoints
+    const res = await profileApi.put('/profile/me', profile);
     return res.data;
   } catch (error) {
     console.error('Error updating user profile:', error);
@@ -61,7 +78,8 @@ export const updateUserProfile = async (profile: UserProfile) => {
 // Change user password
 export const changePassword = async (data: { currentPassword: string; newPassword: string }) => {
   try {
-    const res = await api.put('/profile/me/password', data);
+    // Use profileApi instance for auth endpoints
+    const res = await profileApi.put('/auth/change-password', data);
     return res.data;
   } catch (error) {
     console.error('Error changing password:', error);
@@ -79,7 +97,8 @@ export const changePassword = async (data: { currentPassword: string; newPasswor
 // Get user preferences
 export const getUserPreferences = async () => {
   try {
-    const res = await api.get('/profile/preferences');
+    // Use profileApi instance for profile endpoints
+    const res = await profileApi.get('/profile/preferences');
     return res.data;
   } catch (error) {
     console.error('Error fetching user preferences:', error);
@@ -90,7 +109,8 @@ export const getUserPreferences = async () => {
 // Update user preferences
 export const updateUserPreferences = async (preferences: UserPreferences) => {
   try {
-    const res = await api.put('/profile/preferences', preferences);
+    // Use profileApi instance for profile endpoints
+    const res = await profileApi.put('/profile/preferences', preferences);
     return res.data;
   } catch (error) {
     console.error('Error updating user preferences:', error);
@@ -101,7 +121,8 @@ export const updateUserPreferences = async (preferences: UserPreferences) => {
 // Get user notification settings
 export const getUserNotifications = async () => {
   try {
-    const res = await api.get('/profile/notifications');
+    // Use profileApi instance for profile endpoints
+    const res = await profileApi.get('/profile/notifications');
     return res.data;
   } catch (error) {
     console.error('Error fetching user notifications:', error);
@@ -112,7 +133,8 @@ export const getUserNotifications = async () => {
 // Update user notification settings
 export const updateUserNotifications = async (notifications: UserNotifications) => {
   try {
-    const res = await api.put('/profile/notifications', notifications);
+    // Use profileApi instance for profile endpoints
+    const res = await profileApi.put('/profile/notifications', notifications);
     return res.data;
   } catch (error) {
     console.error('Error updating user notifications:', error);

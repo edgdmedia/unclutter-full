@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "buildDate": "2025-05-04T15:48:59+01:00",
+  "notes": "Initial production release",
+  "requiredUpdate": false,
+  "features": [
+    "Core financial management features",
+    "Offline support",
+    "Background synchronization"
+  ]
+}

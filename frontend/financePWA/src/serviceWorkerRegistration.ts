@@ -1,4 +1,5 @@
-// Service Worker Registration
+// Service Worker Registration with Version Control
+import versionService from './services/VersionService';
 
 // This function registers the service worker
 export function register() {
@@ -7,6 +8,13 @@ export function register() {
       const swUrl = '/service-worker.js';
       
       registerValidSW(swUrl);
+      
+      // Check for app updates on load
+      versionService.checkForUpdates().then(({ hasUpdate, versionInfo }) => {
+        if (hasUpdate) {
+          console.log('App update available:', versionInfo?.version);
+        }
+      });
       
       // Add listener for online/offline events to trigger sync
       window.addEventListener('online', () => {
@@ -18,6 +26,9 @@ export function register() {
             registration.sync.register('sync-accounts');
             registration.sync.register('sync-categories');
           }
+          
+          // Check for updates when we come back online
+          versionService.checkForUpdates();
         });
       });
     });
@@ -36,6 +47,9 @@ function registerValidSW(swUrl: string) {
       setInterval(() => {
         registration.update();
         console.log('Checking for service worker updates');
+        
+        // Also check for app version updates
+        versionService.checkForUpdates();
       }, 1000 * 60 * 60); // Check every hour
       
       registration.onupdatefound = () => {
@@ -57,7 +71,7 @@ function registerValidSW(swUrl: string) {
                 navigator.serviceWorker.ready.then(registration => {
                   registration.showNotification('App Update Available', {
                     body: 'New features are available. Close all tabs to update.',
-                    icon: '/assets/icon-192x192.png'
+                    icon: '/assets/icons/icon-192x192.png'
                   });
                 });
               }
@@ -91,6 +105,14 @@ function registerValidSW(swUrl: string) {
       // Set up message listener for service worker communication
       navigator.serviceWorker.addEventListener('message', event => {
         console.log('Received message from service worker:', event.data);
+        
+        // Handle service worker update messages
+        if (event.data.type === 'SW_UPDATED') {
+          console.log(`Service worker updated to version: ${event.data.version}`);
+          
+          // Check for app updates when service worker updates
+          versionService.checkForUpdates();
+        }
         
         // Handle sync messages
         if (event.data.type === 'SYNC_STARTED') {
@@ -136,5 +158,16 @@ export function requestNotificationPermission() {
         console.log('Notification permission granted.');
       }
     });
+  }
+}
+
+// Check if the app needs to be updated
+export async function checkForAppUpdates() {
+  try {
+    const { hasUpdate, versionInfo } = await versionService.checkForUpdates();
+    return { hasUpdate, versionInfo };
+  } catch (error) {
+    console.error('Error checking for app updates:', error);
+    return { hasUpdate: false, versionInfo: null };
   }
 }

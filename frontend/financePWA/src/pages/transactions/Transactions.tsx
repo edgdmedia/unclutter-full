@@ -9,6 +9,7 @@ import { format, parseISO } from 'date-fns';
 import TransactionFormDialog from '@/components/transactions/TransactionFormDialog';
 import { toast } from '@/components/ui/sonner';
 import { Transaction } from '@/services/transactionsApi';
+import TransactionList from '@/components/dashboard/TransactionList';
 
 const Transactions: React.FC = () => {
   const { transactions, fetchTransactions, addTransaction } = useFinance();
@@ -18,23 +19,28 @@ const Transactions: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   // Fetch transactions when component mounts
-  useEffect(() => {
-    const loadTransactions = async () => {
-      if (transactions.length === 0) {
-        setIsLoading(true);
-        try {
-          await fetchTransactions(20); // Fetch more transactions for the transactions page
-        } catch (error) {
-          console.error('Failed to fetch transactions:', error);
-          toast.error('Failed to load transactions');
-        } finally {
-          setIsLoading(false);
-        }
+  // Track if we've attempted to fetch transactions
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
+  
+  // Extract loadTransactions function so it can be called from retry button
+  const loadTransactions = async () => {
+    if (transactions.length === 0 || !hasAttemptedFetch) {
+      setIsLoading(true);
+      try {
+        await fetchTransactions(20); // Fetch more transactions for the transactions page
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+        toast.error('Failed to load transactions');
+      } finally {
+        setIsLoading(false);
+        setHasAttemptedFetch(true);
       }
-    };
-    
+    }
+  };
+  
+  useEffect(() => {
     loadTransactions();
-  }, [fetchTransactions, transactions.length]);
+  }, [fetchTransactions, transactions.length, hasAttemptedFetch]);
   
   // Filter transactions based on search query
   const filteredTransactions = transactions.filter((transaction) => {
@@ -118,13 +124,7 @@ const Transactions: React.FC = () => {
         </Button>
       </div>
       
-      {isLoading && (
-        <div className="flex justify-center py-10">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )}
-
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-grow">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -132,60 +132,46 @@ const Transactions: React.FC = () => {
             className="pl-9"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={isLoading}
           />
         </div>
-        <Button variant="outline" className="md:w-auto w-full">
+        <Button variant="outline" className="md:w-auto w-full" disabled={isLoading}>
           <Filter size={16} className="mr-1" /> Filters <ChevronDown size={16} className="ml-1" />
         </Button>
       </div>
 
-      {Object.entries(transactionsByDate).map(([date, dayTransactions]) => (
-        <div key={date} className="space-y-2">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            {format(new Date(date), 'MMMM d, yyyy')}
-          </h2>
-          <Card>
-            <CardContent className="p-0">
-              {dayTransactions.map((transaction) => (
-                <div key={transaction.id} className="border-b last:border-b-0 border-border">
-                  <button 
-                    className="w-full text-left px-4 py-3 flex items-center justify-between"
-                    onClick={() => handleViewTransaction(transaction)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        transaction.type === 'income' ? 'bg-finance-green/10' : 'bg-finance-red/10'
-                      }`}>
-                        {transaction.type === 'income' ? (
-                          <ArrowUpRight className={`h-5 w-5 text-finance-green`} />
-                        ) : (
-                          <ArrowDownLeft className={`h-5 w-5 text-finance-red`} />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-medium">{transaction.description || 'Unnamed transaction'}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {transaction.category_name || 'Uncategorized'} • {transaction.account_name || 'Unknown account'}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <span className={`font-semibold ${
-                        transaction.type === 'income' ? 'text-finance-green' : 'text-finance-red'
-                      }`}>
-                        {transaction.type === 'income' ? '+' : '-'}
-                        ₦{parseFloat(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+      {/* Loading state */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-10">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Loading transactions...</p>
         </div>
-      ))}
-
-      {filteredTransactions.length === 0 && (
+      ) : filteredTransactions.length > 0 ? (
+        /* Transactions list when data is available */
+        Object.entries(transactionsByDate).map(([date, dayTransactions]) => (
+          <div key={date} className="space-y-2 mb-6">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              {format(new Date(date), 'MMMM d, yyyy')}
+            </h2>
+            <Card>
+              <CardContent className="p-2">
+                <TransactionList
+                  transactions={dayTransactions}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        ))
+      ) : searchQuery ? (
+        /* No results for search query */
+        <div className="text-center py-10">
+          <p className="text-muted-foreground mb-4">No transactions match your search</p>
+          <Button variant="outline" onClick={() => setSearchQuery('')}>
+            Clear Search
+          </Button>
+        </div>
+      ) : hasAttemptedFetch ? (
+        /* No transactions after fetch attempt */
         <div className="text-center py-10">
           <p className="text-muted-foreground mb-4">No transactions found</p>
           <Button onClick={() => {
@@ -193,6 +179,17 @@ const Transactions: React.FC = () => {
             setShowTransactionForm(true);
           }}>
             <Plus size={16} className="mr-1" /> Add Your First Transaction
+          </Button>
+        </div>
+      ) : (
+        /* Failed to load */
+        <div className="text-center py-10">
+          <p className="text-muted-foreground mb-4">Failed to load transactions</p>
+          <Button variant="outline" onClick={() => {
+            setHasAttemptedFetch(false);
+            loadTransactions();
+          }}>
+            Retry
           </Button>
         </div>
       )}

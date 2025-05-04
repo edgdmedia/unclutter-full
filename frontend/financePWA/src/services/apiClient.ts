@@ -13,11 +13,6 @@ api.interceptors.request.use(
   (config) => {
     console.log(`API Request to: ${config.url}`);
     
-    // Do not attach token for auth endpoints
-    if (config.url?.includes('/auth/')) {
-      return config;
-    }
-    
     // Get token from localStorage
     const token = localStorage.getItem('token');
     console.log('Token from localStorage:', token ? 'Found' : 'Not found');
@@ -53,34 +48,39 @@ api.interceptors.response.use(
       
       try {
         // Try to refresh the token
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
+        const currentAccessToken = localStorage.getItem('token'); 
+        const refreshTokenFromStorage = localStorage.getItem('refreshToken');
+        
+        if (!refreshTokenFromStorage || !currentAccessToken) {
+          throw new Error('Missing tokens for refresh');
         }
         
-        // Call auth refresh endpoint
-        const response = await authApi.refreshToken(refreshToken);
+        // Call updated auth refresh endpoint
+        // Pass both current access token and refresh token
+        const response = await authApi.refreshToken(currentAccessToken, refreshTokenFromStorage);
         
-        if (response.success) {
-          // Update token in localStorage
-          localStorage.setItem('token', response.data.token);
-          localStorage.setItem('refreshToken', response.data.refreshToken);
+        if (response.success && response.data) {
+          // Update ONLY the access token in localStorage
+          localStorage.setItem('token', response.data); 
+          // The backend does not return a new refresh token in this case
+          // localStorage.setItem('refreshToken', response.data.refreshToken); // REMOVE or COMMENT OUT
           
-          // Update the Authorization header
-          originalRequest.headers['Authorization'] = `Bearer ${response.data.token}`;
+          // Update the Authorization header for the retried request
+          originalRequest.headers['Authorization'] = `Bearer ${response.data}`;
           
           // Retry the original request
           return api(originalRequest);
         } else {
-          throw new Error('Token refresh failed');
+          throw new Error(response.message || 'Token refresh failed');
         }
       } catch (refreshError) {
+        console.error('Token refresh error:', refreshError);
         // If refresh fails, log out the user
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
         
         // Redirect to login page
-        window.location.href = '/login';
+        window.location.href = '/login'; 
         
         return Promise.reject(refreshError);
       }

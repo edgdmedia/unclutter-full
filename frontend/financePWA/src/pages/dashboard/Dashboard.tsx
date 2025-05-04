@@ -30,18 +30,175 @@ const Dashboard: React.FC = () => {
     addTransaction
   } = useFinance();
   
-  // Fetch dashboard data if not already loaded
+  // Add loading states for different data types
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [isLoadingBudgets, setIsLoadingBudgets] = useState(false);
+  const [isLoadingGoals, setIsLoadingGoals] = useState(false);
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState({
+    transactions: false,
+    dashboardSummary: false,
+    dashboardTrends: false
+  });
+  
+  // Simpler approach - just clear localStorage for the new user
+  const clearCacheForNewUser = () => {
+    console.log('Clearing cache for new user');
+    try {
+      // Clear localStorage items
+      localStorage.removeItem('dashboardSummary');
+      localStorage.removeItem('dashboardTrends');
+      localStorage.removeItem('transactions');
+      localStorage.removeItem('accounts');
+      localStorage.removeItem('categories');
+      localStorage.removeItem('budgets');
+      localStorage.removeItem('goals');
+      localStorage.removeItem('preferences');
+      
+      console.log('Successfully cleared localStorage cache');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  };
+  
+  // Add a ref to track if we've already loaded data for this session
+  const dataLoadedRef = React.useRef(false);
+
+  // Fetch dashboard data on component mount
   React.useEffect(() => {
-    if (!dashboardSummary) {
-      fetchDashboardSummary();
+    // Skip if we've already loaded data and nothing important has changed
+    if (dataLoadedRef.current && dashboardSummary && dashboardTrends && transactions.length > 0) {
+      return;
     }
-    if (!dashboardTrends) {
-      fetchDashboardTrends();
-    }
-    if (transactions.length === 0) {
-      fetchTransactions(5);
-    }
-  }, [dashboardSummary, dashboardTrends, transactions.length, fetchDashboardSummary, fetchDashboardTrends, fetchTransactions]);
+    
+    const loadData = async () => {
+      console.log('Dashboard: Loading data');
+      
+      // Get current user email from localStorage
+      const currentUserEmail = localStorage.getItem('userEmail');
+      
+      // Get the last loaded user email from localStorage
+      const lastLoadedUserEmail = localStorage.getItem('lastLoadedUserEmail');
+      
+      // Check if this is a new user (different from the last loaded user)
+      const isNewUser = currentUserEmail && lastLoadedUserEmail && currentUserEmail !== lastLoadedUserEmail;
+      
+      console.log(`Current user: ${currentUserEmail}, Last loaded: ${lastLoadedUserEmail}, Is new user: ${isNewUser}`);
+      
+      if (isNewUser) {
+        // New user flow: clear cache, fetch new data, update UI
+        console.log('New user detected, clearing data and fetching fresh data');
+        
+        // Show loading states
+        setIsLoadingTransactions(true);
+        setIsLoadingBudgets(true);
+        setIsLoadingGoals(true);
+        
+        // Clear cache for the new user - simpler approach
+        clearCacheForNewUser();
+        
+        try {
+          // Reset attempt states to force new fetches
+          setHasAttemptedFetch({
+            transactions: false,
+            dashboardSummary: false,
+            dashboardTrends: false
+          });
+          
+          // Fetch all data in parallel
+          await Promise.all([
+            fetchDashboardSummary(),
+            fetchDashboardTrends(),
+            fetchTransactions(5) // Fetch just a few for the dashboard
+          ]);
+          console.log('Successfully fetched all dashboard data for new user');
+          
+          // Store the current user as the last loaded user
+          localStorage.setItem('lastLoadedUserEmail', currentUserEmail);
+          
+          // Mark that we've loaded data for this session
+          dataLoadedRef.current = true;
+        } catch (error) {
+          console.error('Failed to fetch dashboard data for new user:', error);
+        } finally {
+          // Update attempt states
+          setHasAttemptedFetch({
+            transactions: true,
+            dashboardSummary: true,
+            dashboardTrends: true
+          });
+          
+          // Hide loading states
+          setIsLoadingTransactions(false);
+          setIsLoadingBudgets(false);
+          setIsLoadingGoals(false);
+        }
+      } else {
+        // Same user flow: load from DB and refresh with new fetched data
+        console.log('Same user or first load, using normal data loading flow');
+        
+        // Store the current user as the last loaded user if not set
+        if (currentUserEmail && !lastLoadedUserEmail) {
+          localStorage.setItem('lastLoadedUserEmail', currentUserEmail);
+        }
+        
+        let dataFetched = false;
+        
+        // Fetch dashboard summary
+        if (!dashboardSummary && !hasAttemptedFetch.dashboardSummary) {
+          try {
+            await fetchDashboardSummary();
+            dataFetched = true;
+          } catch (error) {
+            console.error('Failed to fetch dashboard summary:', error);
+          } finally {
+            setHasAttemptedFetch(prev => ({ ...prev, dashboardSummary: true }));
+          }
+        }
+        
+        // Fetch dashboard trends
+        if (!dashboardTrends && !hasAttemptedFetch.dashboardTrends) {
+          try {
+            await fetchDashboardTrends();
+            dataFetched = true;
+          } catch (error) {
+            console.error('Failed to fetch dashboard trends:', error);
+          } finally {
+            setHasAttemptedFetch(prev => ({ ...prev, dashboardTrends: true }));
+          }
+        }
+        
+        // Fetch recent transactions
+        if (transactions.length === 0 && !hasAttemptedFetch.transactions) {
+          setIsLoadingTransactions(true);
+          try {
+            await fetchTransactions(5); // Fetch just a few for the dashboard
+            dataFetched = true;
+          } catch (error) {
+            console.error('Failed to fetch transactions:', error);
+          } finally {
+            setIsLoadingTransactions(false);
+            setHasAttemptedFetch(prev => ({ ...prev, transactions: true }));
+          }
+        }
+        
+        // If we fetched any data, mark that we've loaded data for this session
+        if (dataFetched) {
+          dataLoadedRef.current = true;
+        }
+      }
+    };
+    
+    loadData();
+  }, [
+    // Only include the data existence checks and fetch functions
+    // Remove hasAttemptedFetch from dependencies to prevent loops
+    dashboardSummary, 
+    dashboardTrends, 
+    transactions.length, 
+    fetchDashboardSummary, 
+    fetchDashboardTrends, 
+    fetchTransactions
+  ]);
 
   // Using formatCurrency from utils
 
@@ -176,11 +333,28 @@ const Dashboard: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            {transactions.length > 0 ? (
+            {isLoadingTransactions ? (
+              <div className="py-8 text-center">
+                <div className="flex justify-center mb-2">
+                  <BarChart3 className="h-10 w-10 text-muted-foreground animate-pulse" />
+                </div>
+                <p className="text-muted-foreground">Loading transactions...</p>
+              </div>
+            ) : transactions.length > 0 ? (
               <TransactionList transactions={transactions} limit={5} />
+            ) : hasAttemptedFetch.transactions ? (
+              <div className="py-8 text-center">
+                <p className="text-muted-foreground mb-4">No transactions found</p>
+                <Button variant="outline" onClick={() => setShowTransactionForm(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Your First Transaction
+                </Button>
+              </div>
             ) : (
               <div className="py-8 text-center">
-                <p className="text-muted-foreground">Loading transactions...</p>
+                <p className="text-muted-foreground">Failed to load transactions</p>
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => fetchTransactions(5)}>
+                  Retry
+                </Button>
               </div>
             )}
           </CardContent>
@@ -195,10 +369,26 @@ const Dashboard: React.FC = () => {
             </Button>
           </CardHeader>
           <CardContent>
-            {/* We'll implement real budget API in the next step */}
-            <div className="py-8 text-center">
-              <p className="text-muted-foreground">Loading budget data...</p>
-            </div>
+            {isLoadingBudgets ? (
+              <div className="py-8 text-center">
+                <div className="flex justify-center mb-2">
+                  <BarChart3 className="h-10 w-10 text-muted-foreground animate-pulse" />
+                </div>
+                <p className="text-muted-foreground">Loading budget data...</p>
+              </div>
+            ) : dashboardSummary?.budgets?.length > 0 ? (
+              <div>
+                {/* Budget content will go here when implemented */}
+                <p className="text-muted-foreground text-center">Budget data available</p>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <p className="text-muted-foreground mb-4">No budget data found</p>
+                <Button variant="outline" onClick={() => navigate('/budgets')}>
+                  <Plus className="mr-2 h-4 w-4" /> Create Your First Budget
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -212,10 +402,26 @@ const Dashboard: React.FC = () => {
           </Button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* We'll implement real goals API in the next step */}
-          <div className="col-span-full py-8 text-center">
-            <p className="text-muted-foreground">Loading savings goals...</p>
-          </div>
+          {isLoadingGoals ? (
+            <div className="col-span-full py-8 text-center">
+              <div className="flex justify-center mb-2">
+                <TrendingUp className="h-10 w-10 text-muted-foreground animate-pulse" />
+              </div>
+              <p className="text-muted-foreground">Loading savings goals...</p>
+            </div>
+          ) : dashboardSummary?.goals?.length > 0 ? (
+            <div className="col-span-full">
+              {/* Goals content will go here when implemented */}
+              <p className="text-muted-foreground text-center">Savings goals available</p>
+            </div>
+          ) : (
+            <div className="col-span-full py-8 text-center">
+              <p className="text-muted-foreground mb-4">No savings goals found</p>
+              <Button variant="outline" onClick={() => navigate('/goals')}>
+                <Plus className="mr-2 h-4 w-4" /> Create Your First Savings Goal
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
